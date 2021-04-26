@@ -43,7 +43,7 @@ class dot:
     def mutate(self):
         for d in range(len(self.directions)):
             r = random.uniform(0, 1)
-            if r < 0.05:
+            if r < 0.01:
                 rads = math.radians(random.randint(0, 360))
                 direction = point(math.cos(rads) * self.speed, math.sin(rads) * self.speed)
                 self.directions[d] = direction
