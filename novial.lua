@@ -86,7 +86,12 @@ end
 
 function display_buttons()
     for k, v in pairs(inputs_keys) do
-        gui.drawtext(210, y_offset + (k-1)*10, v, color1, color2)
+        local _inputs = joypad.read(1)
+        if _inputs[v] then
+            gui.drawtext(210, y_offset + (k-1)*10, v, color1, color2)
+        else
+            gui.drawtext(210, y_offset + (k-1)*10, v, color2, color2)
+        end
     end
 end
 
@@ -117,11 +122,18 @@ end
 
 function linear_combination(inputs, weights)
     if #inputs == #weights then
-        -- hi
+        local lc = 0
+        for i=1, #inputs do 
+            lc = lc + inputs[i] * weights[i]
+        end
+        return lc
     else 
         print("Error: length of tables inputs and weights are not the same")
     end
 end
+
+local a = sigmoid(linear_combination({3,5,5,2}, {0.5,0.1,0.2,0.7}))
+print(a)
 
 connect_gene_innov = 1
 global_connects = {}
@@ -153,6 +165,10 @@ function new_genome()
                 table.remove(genome.nodes, k)
             end
         end
+    end
+
+    function genome:get_in_nodes(innov)
+        
     end
 
     function genome:add_connection(node1, node2)
@@ -192,6 +208,10 @@ function new_genome()
                 _innov = _innov + 1
             end
         end
+    end
+
+    function genome:get_output()
+
     end
 
     function genome:get_fitness()
@@ -236,7 +256,6 @@ function new_generation(number_of_genomes)
 
     function generation:update_all_genomes()
         for k, v in pairs(genomes) do
-            print(v)
             v:update_i_nodes()
         end
     end
@@ -283,8 +302,12 @@ function is_same_species(genome1, genome2)
     return (c1 * #diff_genes) / N
 end
 
+function draw_connections()
+
+end
+
 gen = new_generation(5)
-print(gen.genomes)
+-- print(gen.genomes)
 
 while (true) do
     get_positions()
