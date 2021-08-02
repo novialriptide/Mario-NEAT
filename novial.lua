@@ -155,7 +155,10 @@ global_connects = {}
 function new_genome()
     local genome = {
         nodes = {}, -- node genes
-        connects = {} -- connection genes
+        connects = {}, -- connection genes
+        generation_id = 0,
+        species_id = 0,
+        genome_id = 0
     }
 
     function genome:add_i_node(x, y, val)
@@ -319,20 +322,32 @@ function basic_setup(genome)
     end
 end
 
-function new_generation(number_of_genomes)
+function new_generation(number_of_genomes, innov)
     local generation = {
-        genomes = {}
+        genomes = {},
+        highest_species_id = 1,
+        innov = innov
     }
 
-    for i = 1, number_of_genomes do
-        g = new_genome()
-        basic_setup(g)
-        table.insert(generation.genomes, g)
-    end
-    
     function generation:new_genome()
         local g = new_genome()
         basic_setup(g)
+        if #generation.genomes > 0 then
+            for k, v in pairs(generation.genomes) do
+                if is_same_species(v, g) < config.compatibility_threshold then
+                    g.generation_id = generation.innov
+                    g.species_id = v.species_id
+                    g.genome_id = #generation.genomes + 1
+                    table.insert(generation.genomes, g)
+                    return
+                end
+            end
+        end
+
+        g.generation_id = generation.innov
+        g.species_id = generation.highest_species_id
+        g.genome_id = #generation.genomes + 1
+        generation.highest_species_id = generation.highest_species_id + 1 
         table.insert(generation.genomes, g)
     end
 
@@ -345,25 +360,28 @@ function new_generation(number_of_genomes)
             v:update_i_nodes(1)
         end
     end
+    
+    for i = 1, number_of_genomes do
+        generation:new_genome()
+    end
 
     return generation
 end
 
 function mutate(genome)
     if config.node_add_prob > math.random() then
-        print("added node")
+        -- print("added node")
         genome:add_h_node()
     end
 
     if config.node_delete_prob > math.random() then
-        print("deleted node")
+        -- print("deleted node")
         genome:delete_node(math.random(1, #genome.nodes))
     end
 
-    -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
-
     if config.conn_add_prob > math.random() then
-        print("added conn")
+        -- print("added conn")
+        -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
         if #genome.nodes > 229 and 0.5 > math.random(0, 1) then
             genome:add_connection(math.random(222, #genome.nodes), math.random(230, #genome.nodes))
         else
@@ -372,7 +390,7 @@ function mutate(genome)
     end
 
     if config.conn_delete_prob > math.random() and #genome.connects > 0 then
-        print("deleted conn")
+        -- print("deleted conn")
         genome:remove_connection(math.random(1, #genome.connects))
     end
 
@@ -426,19 +444,18 @@ function is_same_species(genome1, genome2)
     return (c1 * #diff_genes) / N
 end
 
-function draw_connections()
-
+function draw_info(generation, species, genome)
+    gui.drawtext(x_offset, y_offset + box_size*16, "gen: "..generation, color1, color2)
+    gui.drawtext(x_offset, y_offset + box_size*16+10, "species: "..species, color1, color2)
+    gui.drawtext(x_offset, y_offset + box_size*16+10*2, "genome: "..genome, color1, color2)
 end
 
-gen = new_generation(5)
--- print(gen.genomes)
-
-g1 = gen.genomes[1]
-for i=1, 4 do
+gen = new_generation(5, 1)
+print(gen)
+g1 = gen.genomes[3]
+for i=1, 300 do
     mutate(g1)
 end
-
-print(g1)
 
 while (true) do
     -- gui.drawbox(0, 0, 256, 100, 0xFFFFFFFF)
@@ -447,6 +464,7 @@ while (true) do
     read_enemies(level)
     display_map(level)
     display_buttons()
+    draw_info(g1.generation_id, g1.species_id, g1.genome_id)
     gen:update_all_genomes()
     g1:draw_connections()
     g1:draw_hidden()
