@@ -265,7 +265,9 @@ function new_genome()
                 local in_nodes = genome:get_in_nodes(v.innov)
                 local sum = 0
                 for k, v in pairs(in_nodes) do
-                    sum = sum + genome:get_node(v.innov).value * v.weight
+                    if genome:does_node_exist(v.innov) then
+                        sum = sum + genome:get_node(v.innov).value * v.weight
+                    end
                 end
                 v.value = sum
             end
@@ -322,6 +324,41 @@ function basic_setup(genome)
     end
 end
 
+function breed(genome1, genome2)
+
+end
+
+function is_same_species(genome1, genome2)
+    local diff_genes = {}
+    function check(t1, t2)
+        function has_value(table, value)
+            for k, v in pairs(table) do
+                if v.innov == value then 
+                    return true
+                end
+            end
+            return false
+        end
+
+        for k, v in pairs(t1.connects) do
+            if has_value(t2.connects, v.innov) == false then
+                table.insert(diff_genes, v)
+            end
+        end
+    end
+    check(genome1, genome2)
+    check(genome2, genome1)
+    
+    local c1 = 1.0
+    local c2 = 1.0
+    local c3 = 1.0
+    local N = #genome1.connects
+    if #genome1.connects < #genome2.connects then
+        N = #genome2.connects
+    end
+    return (c1 * #diff_genes) / N
+end
+
 function new_generation(number_of_genomes, innov)
     local generation = {
         genomes = {},
@@ -332,23 +369,35 @@ function new_generation(number_of_genomes, innov)
     function generation:new_genome()
         local g = new_genome()
         basic_setup(g)
+        table.insert(generation.genomes, g)
+        g.generation_id = generation.innov
+        g.genome_id = #generation.genomes + 1
+    end
+
+    function generation:get_genome(genome_id)
+        for k, v in pairs(generation.genomes) do
+            if v.genome_id == genome_id then
+                return v
+            end
+        end
+    end
+
+    function generation:check_species(genome_id)
+        local g = generation.genomes[genome_id]
         if #generation.genomes > 0 then
             for k, v in pairs(generation.genomes) do
-                if is_same_species(v, g) < config.compatibility_threshold then
-                    g.generation_id = generation.innov
+                local species_compatibility = is_same_species(v, g)
+                print(species_compatibility)
+                if species_compatibility < config.compatibility_threshold then
                     g.species_id = v.species_id
-                    g.genome_id = #generation.genomes + 1
                     table.insert(generation.genomes, g)
                     return
                 end
             end
         end
 
-        g.generation_id = generation.innov
         g.species_id = generation.highest_species_id
-        g.genome_id = #generation.genomes + 1
         generation.highest_species_id = generation.highest_species_id + 1 
-        table.insert(generation.genomes, g)
     end
 
     function generation:get_average_fitness()
@@ -409,41 +458,6 @@ function mutate(genome)
     end
 end
 
-function breed(genome1, genome2)
-
-end
-
-function is_same_species(genome1, genome2)
-    local diff_genes = {}
-    function check(t1, t2)
-        function has_value(table, value)
-            for k, v in pairs(table) do
-                if v.innov == value then 
-                    return true
-                end
-            end
-            return false
-        end
-        
-        for k, v in pairs(t1.connects) do
-            if has_value(t2.connects, v.innov) == false then
-                table.insert(diff_genes, v)
-            end
-        end
-    end
-    check(genome1, genome2)
-    check(genome2, genome1)
-    
-    local c1 = 1.0
-    local c2 = 1.0
-    local c3 = 1.0
-    local N = #genome1.connects
-    if #genome1.connects < #genome2.connects then
-        N = #genome2.connects
-    end
-    return (c1 * #diff_genes) / N
-end
-
 function draw_info(generation, species, genome)
     gui.drawtext(x_offset, y_offset + box_size*16, "gen: "..generation, color1, color2)
     gui.drawtext(x_offset, y_offset + box_size*16+10, "species: "..species, color1, color2)
@@ -451,11 +465,12 @@ function draw_info(generation, species, genome)
 end
 
 gen = new_generation(5, 1)
-print(gen)
+-- print(gen)
 g1 = gen.genomes[3]
 for i=1, 300 do
     mutate(g1)
 end
+gen:check_species(3)
 
 while (true) do
     -- gui.drawbox(0, 0, 256, 100, 0xFFFFFFFF)
