@@ -156,9 +156,9 @@ function new_genome()
     local genome = {
         nodes = {}, -- node genes
         connects = {}, -- connection genes
-        generation_id = 0,
-        species_id = 0,
-        genome_id = 0
+        generation_id = 1,
+        species_id = 1,
+        genome_id = 1
     }
 
     function genome:add_i_node(x, y, val)
@@ -346,17 +346,30 @@ function is_same_species(genome1, genome2)
             end
         end
     end
+
+    function get_average_weight(genome)
+        local average = 0
+        for k, v in pairs(genome.connects) do 
+            average = average + v.weight
+        end
+        if #genome.connects == 0 then
+            return 0
+        else
+            return average / #genome.connects
+        end
+    end
+
     check(genome1, genome2)
     check(genome2, genome1)
     
-    local c1 = 1.0
-    local c2 = 1.0
-    local c3 = 1.0
     local N = #genome1.connects
     if #genome1.connects < #genome2.connects then
         N = #genome2.connects
     end
-    return (c1 * #diff_genes) / N
+    if #genome1.connects < 20 and #genome2.connects < 20 then
+        N = 1
+    end
+    return ((#diff_genes) / N) + (get_average_weight(genome1) - get_average_weight(genome2))
 end
 
 function new_generation(number_of_genomes, innov)
@@ -394,10 +407,10 @@ function new_generation(number_of_genomes, innov)
                     return
                 end
             end
+            
+            g.species_id = generation.highest_species_id + 1
+            generation.highest_species_id = generation.highest_species_id + 1 
         end
-
-        g.species_id = generation.highest_species_id
-        generation.highest_species_id = generation.highest_species_id + 1 
     end
 
     function generation:get_average_fitness()
