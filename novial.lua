@@ -94,7 +94,7 @@ end
 
 function cell_to_screen(x, y)
     local x = x - 2
-    return {x = x_offset+x*box_size, y = y_offset+y*box_size}
+    return {x = x_offset+x*box_size, y = y_offset+(y-2)*box_size}
 end
 
 function display_buttons()
@@ -158,13 +158,13 @@ function new_genome()
         connects = {}, -- connection genes
         generation_id = 1,
         species_id = 1,
-        genome_id = 1
+        genome_id = 0
     }
 
-    function genome:add_i_node(x, y, val)
+    function genome:add_i_node(x, y, val) -- create a new method to get hte va
         -- x and y should not be used in NEAT itself
         local world_coords = cell_to_screen(x, y)
-        local in_node = {innov = table.getn(genome.nodes)+1, type = "INPUT", x = world_coords.x + box_size/2, y = world_coords.y + box_size/2, value = val}
+        local in_node = {innov = table.getn(genome.nodes)+1, type = "INPUT", x = world_coords.x + box_size/2, y = world_coords.y + box_size/2, cell_x = x, cell_y = y, value = val}
         table.insert(genome.nodes, in_node)
     end
 
@@ -361,6 +361,7 @@ function is_same_species(genome1, genome2)
 
     check(genome1, genome2)
     check(genome2, genome1)
+    print(genome1.genome_id, genome2.genome_id)
     
     local N = #genome1.connects
     if #genome1.connects < #genome2.connects then
@@ -369,6 +370,7 @@ function is_same_species(genome1, genome2)
     if #genome1.connects < 20 and #genome2.connects < 20 then
         N = 1
     end
+    
     return ((#diff_genes) / N) + (get_average_weight(genome1) - get_average_weight(genome2))
 end
 
@@ -379,12 +381,37 @@ function new_generation(number_of_genomes, innov)
         innov = innov
     }
 
+    function generation:check_species(genome_id)
+        local g = generation.genomes[genome_id]
+        if #generation.genomes > 0 then
+            for k, v in pairs(generation.genomes) do
+                if genome_id ~= v.genome_id then
+                    local species_compatibility = is_same_species(v, g)
+                    print("spec_com", species_compatibility)
+                    if species_compatibility < config.compatibility_threshold then
+                        g.species_id = v.species_id
+                        table.insert(generation.genomes, g)
+                        return
+                    end
+                end
+            end
+            
+            g.species_id = generation.highest_species_id + 1
+            generation.highest_species_id = generation.highest_species_id + 1 
+        end
+    end
+
     function generation:new_genome()
         local g = new_genome()
         basic_setup(g)
         table.insert(generation.genomes, g)
         g.generation_id = generation.innov
-        g.genome_id = #generation.genomes + 1
+        g.genome_id = #generation.genomes
+
+        if #generation.genomes > 1 then
+            generation:check_species(g.genome_id)
+            print("g", g.genome_id)
+        end
     end
 
     function generation:get_genome(genome_id)
@@ -392,24 +419,6 @@ function new_generation(number_of_genomes, innov)
             if v.genome_id == genome_id then
                 return v
             end
-        end
-    end
-
-    function generation:check_species(genome_id)
-        local g = generation.genomes[genome_id]
-        if #generation.genomes > 0 then
-            for k, v in pairs(generation.genomes) do
-                local species_compatibility = is_same_species(v, g)
-                print(species_compatibility)
-                if species_compatibility < config.compatibility_threshold then
-                    g.species_id = v.species_id
-                    table.insert(generation.genomes, g)
-                    return
-                end
-            end
-            
-            g.species_id = generation.highest_species_id + 1
-            generation.highest_species_id = generation.highest_species_id + 1 
         end
     end
 
@@ -480,10 +489,12 @@ end
 gen = new_generation(5, 1)
 -- print(gen)
 g1 = gen.genomes[3]
-for i=1, 300 do
-    mutate(g1)
-end
-gen:check_species(3)
+--for i=1, 300 do
+--    mutate(g1)
+--end
+
+local test_node = 150
+g1:add_connection(test_node, 222)
 
 while (true) do
     -- gui.drawbox(0, 0, 256, 100, 0xFFFFFFFF)
@@ -493,11 +504,13 @@ while (true) do
     display_map(level)
     display_buttons()
     draw_info(g1.generation_id, g1.species_id, g1.genome_id)
-    gen:update_all_genomes()
     g1:draw_connections()
     g1:draw_hidden()
     g1:eval()
     g1:set_joypad_val()
+    level[g1:get_node(test_node).cell_y][g1:get_node(test_node).cell_x] = 0
+    print(g1:get_node(test_node).cell_x, g1:get_node(test_node).cell_y)
+    print(g1:get_node(test_node).value)
 
     emu.frameadvance()
 end
