@@ -47,7 +47,7 @@ config = {
     response_min_value      = -30.0,
 
     weight_max_value        = 30,
-    weight_min_value        = 10, ---30,
+    weight_min_value        = -30,
     weight_init_mean        = 0.0,
     weight_init_stdev       = 1.0,
     weight_mutate_rate      = 0.8,

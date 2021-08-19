@@ -20,6 +20,15 @@ moving_objects = {}
 
 inputs_keys = {"A", "B", "right", "left", "up", "down", "start", "select"}
 
+function has_value(tab, val)
+    for index, value in ipairs(tab) do
+        if value == val then
+            return true
+        end
+    end
+    return false
+end
+
 function get_positions()
     mario_x = memory.readbyte(0x0086) + memory.readbyte(0x006D) * 256
     mario_y = memory.readbyte(0x03B8)
@@ -94,7 +103,7 @@ end
 
 function cell_to_screen(x, y)
     local x = x - 2
-    return {x = x_offset+x*box_size, y = y_offset+(y-2)*box_size}
+    return {x = x_offset+x*box_size, y = y_offset+(y-0)*box_size}
 end
 
 function display_buttons()
@@ -161,11 +170,32 @@ function new_genome()
         genome_id = 0
     }
 
-    function genome:add_i_node(x, y, val) -- create a new method to get hte va
+    function genome:get_node(innov)
+        for k, v in pairs(genome.nodes) do 
+            if v.innov == innov then
+                return v
+            end
+        end
+    end
+
+    function genome:does_node_exist(innov)
+        if genome:get_node(innov) == nil then
+            return false
+        else
+            return true
+        end
+    end
+
+    function genome:add_i_node(x, y) -- create a new method to get hte va
         -- x and y should not be used in NEAT itself
         local world_coords = cell_to_screen(x, y)
-        local in_node = {innov = table.getn(genome.nodes)+1, type = "INPUT", x = world_coords.x + box_size/2, y = world_coords.y + box_size/2, cell_x = x, cell_y = y, value = val}
+        local in_node = {innov = table.getn(genome.nodes)+1, type = "INPUT", x = world_coords.x + box_size/2, y = world_coords.y + box_size/2, cell_x = x, cell_y = y}
         table.insert(genome.nodes, in_node)
+    end
+
+    function genome:get_i_value(level_data, innov)
+        local g = genome:get_node(innov)
+        return level_data[g.cell_y][g.cell_x]
     end
 
     function genome:add_h_node()
@@ -185,24 +215,6 @@ function new_genome()
                 table.remove(genome.nodes, k)
             end
         end
-    end
-
-    function genome:does_node_exist(innov)
-        for k, v in pairs(genome.nodes) do 
-            if v.innov == innov then
-                return true
-            end
-        end
-        return false
-    end
-
-    function genome:get_node(innov)
-        for k, v in pairs(genome.nodes) do 
-            if v.innov == innov then
-                return v
-            end
-        end
-        print("Error: node doesn't exist \"", innov, "\". There are currently \"", #genome.nodes, "\" nodes in total")
     end
 
     function genome:add_connection(node1, node2)
@@ -237,16 +249,6 @@ function new_genome()
         end
     end
 
-    function genome:update_i_nodes(start_innov)
-        local _innov = start_innov
-        for r=1, table.getn(level) do
-            for c=1, table.getn(level[1]) do
-                genome.nodes[_innov].value = level[r][c]
-                _innov = _innov + 1
-            end
-        end
-    end
-
     function genome:get_in_nodes(innov)
         -- gets all of the nodes that connect to the specific node's input
         local outputs = {}
@@ -258,7 +260,7 @@ function new_genome()
         return outputs
     end
 
-    function genome:eval()
+    function genome:eval(level_data)
         local available_nodes = {}
         for k, v in pairs(genome.nodes) do
             if v.type ~= "INPUT" then
@@ -266,7 +268,15 @@ function new_genome()
                 local sum = 0
                 for k, v in pairs(in_nodes) do
                     if genome:does_node_exist(v.innov) then
-                        sum = sum + genome:get_node(v.innov).value * v.weight
+                        local val = nil
+                        local g = genome:get_node(v.innov)
+                        if g.type == "INPUT" then
+                            val = genome:get_i_value(level_data, v.innov)
+                        else
+                            val = g.value
+                        end
+
+                        sum = sum + val * v.weight
                     end
                 end
                 v.value = sum
@@ -314,7 +324,7 @@ end
 function basic_setup(genome)
     for r=1, table.getn(level) do
         for c=1, table.getn(level[1]) do
-            genome:add_i_node(c, r, level[r][c])
+            genome:add_i_node(c, r)
         end
     end
     
@@ -331,9 +341,9 @@ end
 function is_same_species(genome1, genome2)
     local diff_genes = {}
     function check(t1, t2)
-        function has_value(table, value)
+        local function has_value(table, value)
             for k, v in pairs(table) do
-                if v.innov == value then 
+                if v.innov == value then
                     return true
                 end
             end
@@ -361,7 +371,6 @@ function is_same_species(genome1, genome2)
 
     check(genome1, genome2)
     check(genome2, genome1)
-    print(genome1.genome_id, genome2.genome_id)
     
     local N = #genome1.connects
     if #genome1.connects < #genome2.connects then
@@ -371,33 +380,54 @@ function is_same_species(genome1, genome2)
         N = 1
     end
     
-    return ((#diff_genes) / N) + (get_average_weight(genome1) - get_average_weight(genome2))
+    local eqtn = ((#diff_genes) / N) + (get_average_weight(genome1) - get_average_weight(genome2))
+    return eqtn
 end
 
 function new_generation(number_of_genomes, innov)
     local generation = {
         genomes = {},
         highest_species_id = 1,
-        innov = innov
+        total_genomes = 0,
+        innov = innov,
+        species_rep = {1}
     }
 
+    function generation:get_genome(genome_id)
+        for k, v in pairs(generation.genomes) do
+            if v.genome_id == genome_id then
+                return v
+            end
+        end
+    end
+
     function generation:check_species(genome_id)
+        print("testing genome_id: ".. genome_id)
         local g = generation.genomes[genome_id]
-        if #generation.genomes > 0 then
-            for k, v in pairs(generation.genomes) do
-                if genome_id ~= v.genome_id then
-                    local species_compatibility = is_same_species(v, g)
-                    print("spec_com", species_compatibility)
-                    if species_compatibility < config.compatibility_threshold then
-                        g.species_id = v.species_id
-                        table.insert(generation.genomes, g)
-                        return
-                    end
+        local species_found = false
+        if #generation.genomes > 0 and has_value(generation.species_rep, genome_id) == false then
+            for k, v in pairs(generation.species_rep) do
+                local other_g = generation:get_genome(v)
+                local species_compatibility = is_same_species(other_g, g)
+                print("species rep: "..v..", genome_id: "..g.genome_id..", spec_com: "..species_compatibility)
+
+                if species_compatibility < config.compatibility_threshold then
+                    g.species_id = other_g.species_id
+                    species_found = true
                 end
             end
             
-            g.species_id = generation.highest_species_id + 1
-            generation.highest_species_id = generation.highest_species_id + 1 
+            if not species_found then
+                g.species_id = generation.highest_species_id + 1
+                generation.highest_species_id = generation.highest_species_id + 1
+                generation.species_rep[g.species_id] = g.genome_id
+            end
+        end
+    end
+
+    function generation:check_all_genomes_species()
+        for k, v in pairs(generation.genomes) do
+            generation:check_species(v.genome_id)
         end
     end
 
@@ -407,11 +437,6 @@ function new_generation(number_of_genomes, innov)
         table.insert(generation.genomes, g)
         g.generation_id = generation.innov
         g.genome_id = #generation.genomes
-
-        if #generation.genomes > 1 then
-            generation:check_species(g.genome_id)
-            print("g", g.genome_id)
-        end
     end
 
     function generation:get_genome(genome_id)
@@ -441,17 +466,14 @@ end
 
 function mutate(genome)
     if config.node_add_prob > math.random() then
-        -- print("added node")
         genome:add_h_node()
     end
 
     if config.node_delete_prob > math.random() then
-        -- print("deleted node")
         genome:delete_node(math.random(1, #genome.nodes))
     end
 
     if config.conn_add_prob > math.random() then
-        -- print("added conn")
         -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
         if #genome.nodes > 229 and 0.5 > math.random(0, 1) then
             genome:add_connection(math.random(222, #genome.nodes), math.random(230, #genome.nodes))
@@ -461,7 +483,6 @@ function mutate(genome)
     end
 
     if config.conn_delete_prob > math.random() and #genome.connects > 0 then
-        -- print("deleted conn")
         genome:remove_connection(math.random(1, #genome.connects))
     end
 
@@ -487,14 +508,14 @@ function draw_info(generation, species, genome)
 end
 
 gen = new_generation(5, 1)
--- print(gen)
 g1 = gen.genomes[3]
---for i=1, 300 do
---    mutate(g1)
---end
-
-local test_node = 150
-g1:add_connection(test_node, 222)
+for i=1, 300 do
+    for k, v in pairs(gen.genomes) do
+        mutate(v)
+    end
+end
+gen:check_all_genomes_species()
+print(gen.species_rep)
 
 while (true) do
     -- gui.drawbox(0, 0, 256, 100, 0xFFFFFFFF)
@@ -506,11 +527,8 @@ while (true) do
     draw_info(g1.generation_id, g1.species_id, g1.genome_id)
     g1:draw_connections()
     g1:draw_hidden()
-    g1:eval()
+    g1:eval(level)
     g1:set_joypad_val()
-    level[g1:get_node(test_node).cell_y][g1:get_node(test_node).cell_x] = 0
-    print(g1:get_node(test_node).cell_x, g1:get_node(test_node).cell_y)
-    print(g1:get_node(test_node).value)
 
     emu.frameadvance()
 end
