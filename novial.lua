@@ -96,7 +96,7 @@ function display_map(level)
         for x=1, table.getn(level[y]), 1 do
             if level[y][x] == 1 then draw_tile(x, y, color1, color2) end
             if level[y][x] == 2 then draw_tile(x, y, color3, color3) end
-            if level[y][x] == 3 then draw_tile(x, y, color4, color4) end
+            if level[y][x] >= 3 then draw_tile(x, y, color4, color4) end
         end
     end
 end
@@ -132,7 +132,7 @@ function read_enemies(level)
             local s_ex = math.floor(ex/16)
             local s_ey = math.floor(ey/16)
             if s_ex > 0 and s_ex < table.getn(level[1]) and s_ey > 0 and s_ey < table.getn(level) then
-                level[s_ey][s_ex] = 3
+                level[s_ey][s_ex] = 3 + memory.readbyte(0x0016 + _e)
             end
         end
     end
@@ -167,7 +167,8 @@ function new_genome()
         connects = {}, -- connection genes
         generation_id = 1,
         species_id = 1,
-        genome_id = 0
+        genome_id = 0,
+        calculated_fitness = nil
     }
 
     function genome:get_node(innov)
@@ -297,7 +298,9 @@ function new_genome()
     end
 
     function genome:get_fitness()
-
+        local timer = tonumber(memory.readbyte(0x07F8)..memory.readbyte(0x07F9)..memory.readbyte(0x07FA))
+        local score = timer + mario_x
+        return score
     end
 
     function genome:draw_connections()
@@ -316,6 +319,13 @@ function new_genome()
                 draw_world_tile(v.x, v.y, color1, color2)
             end
         end
+    end
+
+    function genome:is_alive()
+        if memory.readbyte(0x000E) == 11 then -- 6 is dead, 11 is dying
+            return true
+        end
+        return false
     end
 
     return genome
@@ -447,14 +457,26 @@ function new_generation(number_of_genomes, innov)
         end
     end
 
-    function generation:get_average_fitness()
-        
+    function generation:get_adjusted_fitness(genome_id)
+        local g = generation:get_genome(genome_id)
+        local sum = 0
+        for k, v in pairs(generation.genomes) do
+            if v.genome_id ~= genome_id then
+                local thres = 0
+                if math.abs(v.calculated_fitness - g.calculated_fitness) > config.fitness_threshold then
+                    thres = 0
+                else
+                    thres = 1
+                end
+                sum = sum + thres
+            end
+        end
+        print(sum)
+        return g.calculated_fitness / sum
     end
 
-    function generation:update_all_genomes()
-        for k, v in pairs(generation.genomes) do
-            v:update_i_nodes(1)
-        end
+    function generation:get_average_fitness()
+        
     end
     
     for i = 1, number_of_genomes do
@@ -501,14 +523,23 @@ function mutate(genome)
     end
 end
 
-function draw_info(generation, species, genome)
+function draw_info(generation, species, genome, fitness)
     gui.drawtext(x_offset, y_offset + box_size*16, "gen: "..generation, color1, color2)
     gui.drawtext(x_offset, y_offset + box_size*16+10, "species: "..species, color1, color2)
     gui.drawtext(x_offset, y_offset + box_size*16+10*2, "genome: "..genome, color1, color2)
+    gui.drawtext(x_offset, y_offset + box_size*16+10*3, "fitness: "..fitness, color1, color2)
+end
+
+function test_screen_state()
+    if memory.readbyte(0x0770) == 0 then -- weird solution, i know
+        joypad.set(1, {start = true})
+        emu.frameadvance()
+        joypad.set(1, {start = false})
+    end
 end
 
 gen = new_generation(5, 1)
-g1 = gen.genomes[3]
+g1 = gen.genomes[1]
 for i=1, 300 do
     for k, v in pairs(gen.genomes) do
         mutate(v)
@@ -518,17 +549,24 @@ gen:check_all_genomes_species()
 print(gen.species_rep)
 
 while (true) do
-    -- gui.drawbox(0, 0, 256, 100, 0xFFFFFFFF)
     get_positions()
     local level = get_map()
     read_enemies(level)
     display_map(level)
     display_buttons()
-    draw_info(g1.generation_id, g1.species_id, g1.genome_id)
+    draw_info(g1.generation_id, g1.species_id, g1.genome_id, g1:get_fitness())
     g1:draw_connections()
     g1:draw_hidden()
     g1:eval(level)
     g1:set_joypad_val()
+    if g1:is_alive() then
+        print("Final calculated fitness is "..g1:get_fitness())
+        g1.calculated_fitness = g1:get_fitness()
+        print("Adjusted fitness is "..gen:get_adjusted_fitness(g1.genome_id)) -- move this to when all fitness values are calculated
+        emu.poweron()
+        g1 = gen.genomes[g1.genome_id + 1]
+    end
+    test_screen_state()
 
     emu.frameadvance()
 end
