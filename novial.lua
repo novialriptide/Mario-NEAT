@@ -344,10 +344,6 @@ function basic_setup(genome)
     end
 end
 
-function breed(genome1, genome2)
-
-end
-
 function is_same_species(genome1, genome2)
     local diff_genes = {}
     function check(t1, t2)
@@ -484,6 +480,10 @@ function new_generation(number_of_genomes, innov)
     end
 
     return generation
+end
+
+function breed(genome1, genome2)
+
 end
 
 function mutate(genome)
