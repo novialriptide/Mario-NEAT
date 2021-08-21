@@ -9,7 +9,7 @@
 
 config = {
     fitness_criterion     = max,
-    fitness_threshold     = 3.98,
+    fitness_threshold     = 5,
     pop_size              = 500,
     reset_on_extinction   = 0,
 

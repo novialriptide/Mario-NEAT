@@ -280,7 +280,8 @@ function new_genome()
                         sum = sum + val * v.weight
                     end
                 end
-                v.value = sum
+                -- print(sum, sigmoid(sum))
+                v.value = sigmoid(sum)
             end
         end
     end
@@ -288,7 +289,7 @@ function new_genome()
     function genome:set_joypad_val()
         local inputs = {A = nil, B = nil, right = nil, left = nil, up = nil, down = nil, start = nil, select = nil}
         for k, v in pairs(genome.nodes) do
-            if v.type == "OUTPUT" and v.value > 0 then
+            if v.type == "OUTPUT" and v.value > 0.5 then
                 inputs[v.button] = true
             end
         end
@@ -298,8 +299,8 @@ function new_genome()
     end
 
     function genome:get_fitness()
-        local timer = tonumber(memory.readbyte(0x07F8)..memory.readbyte(0x07F9)..memory.readbyte(0x07FA))
-        local score = timer + mario_x
+        local timer = tonumber(memory.readbyte(0x07F8)..memory.readbyte(0x07F9)..memory.readbyte(0x07FA)) / 100
+        local score = timer + mario_x / 10
         return score
     end
 
@@ -467,7 +468,6 @@ function new_generation(number_of_genomes, innov)
                 sum = sum + thres
             end
         end
-        print(sum)
         return g.calculated_fitness / sum
     end
 
@@ -530,7 +530,7 @@ function draw_info(generation, species, genome, fitness)
     gui.drawtext(x_offset, y_offset + box_size*16+10*3, "fitness: "..fitness, color1, color2)
 end
 
-gen = new_generation(5, 1)
+gen = new_generation(3, 1)
 g1 = gen.genomes[1]
 for i=1, 300 do
     for k, v in pairs(gen.genomes) do
