@@ -321,7 +321,7 @@ function new_genome()
         end
     end
 
-    function genome:is_alive()
+    function genome:is_dead()
         if memory.readbyte(0x000E) == 11 then -- 6 is dead, 11 is dying
             return true
         end
@@ -530,14 +530,6 @@ function draw_info(generation, species, genome, fitness)
     gui.drawtext(x_offset, y_offset + box_size*16+10*3, "fitness: "..fitness, color1, color2)
 end
 
-function test_screen_state()
-    if memory.readbyte(0x0770) == 0 then -- weird solution, i know
-        joypad.set(1, {start = true})
-        emu.frameadvance()
-        joypad.set(1, {start = false})
-    end
-end
-
 gen = new_generation(5, 1)
 g1 = gen.genomes[1]
 for i=1, 300 do
@@ -547,6 +539,26 @@ for i=1, 300 do
 end
 gen:check_all_genomes_species()
 print(gen.species_rep)
+
+function test_screen_state()
+    if memory.readbyte(0x0770) == 0 then -- weird solution, i know
+        joypad.set(1, {start = true})
+        emu.frameadvance()
+        joypad.set(1, {start = false})
+    end
+    
+    if g1:is_dead() then
+        g1.calculated_fitness = g1:get_fitness()
+        emu.poweron()
+        if g1.genome_id ~= #gen.genomes then
+            g1 = gen.genomes[g1.genome_id + 1]
+        else
+            for k, v in pairs(gen.genomes) do
+                print(v.genome_id, gen:get_adjusted_fitness(v.genome_id))
+            end
+        end
+    end
+end
 
 while (true) do
     get_positions()
@@ -559,13 +571,6 @@ while (true) do
     g1:draw_hidden()
     g1:eval(level)
     g1:set_joypad_val()
-    if g1:is_alive() then
-        print("Final calculated fitness is "..g1:get_fitness())
-        g1.calculated_fitness = g1:get_fitness()
-        print("Adjusted fitness is "..gen:get_adjusted_fitness(g1.genome_id)) -- move this to when all fitness values are calculated
-        emu.poweron()
-        g1 = gen.genomes[g1.genome_id + 1]
-    end
     test_screen_state()
 
     emu.frameadvance()
