@@ -289,7 +289,7 @@ function new_genome()
     function genome:set_joypad_val()
         local inputs = {A = nil, B = nil, right = nil, left = nil, up = nil, down = nil, start = nil, select = nil}
         for k, v in pairs(genome.nodes) do
-            if v.type == "OUTPUT" and v.value > 0.5 then
+            if v.type == "OUTPUT" and v.value > 0.9 then
                 inputs[v.button] = true
             end
         end
