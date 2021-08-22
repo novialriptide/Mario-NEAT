@@ -409,14 +409,14 @@ function new_generation(number_of_genomes, innov)
     end
 
     function generation:check_species(genome_id)
-        print("testing genome_id: ".. genome_id)
+        -- print("testing genome_id: ".. genome_id)
         local g = generation.genomes[genome_id]
         local species_found = false
         if #generation.genomes > 0 and has_value(generation.species_rep, genome_id) == false then
             for k, v in pairs(generation.species_rep) do
                 local other_g = generation:get_genome(v)
                 local species_compatibility = is_same_species(other_g, g)
-                print("species rep: "..v..", genome_id: "..g.genome_id..", spec_com: "..species_compatibility)
+                -- print("species rep: "..v..", genome_id: "..g.genome_id..", spec_com: "..species_compatibility)
 
                 if species_compatibility < config.compatibility_threshold then
                     g.species_id = other_g.species_id
@@ -458,11 +458,12 @@ function new_generation(number_of_genomes, innov)
         local g = generation:get_genome(genome_id)
         local sum = 0
         for k, v in pairs(generation.genomes) do
-            if v.genome_id ~= genome_id then
+            if v.genome_id ~= genome_id and g.species_id == v.species_id then
                 local thres = 0
                 if math.abs(v.calculated_fitness - g.calculated_fitness) > config.fitness_threshold then
                     thres = 0
-                else
+                end
+                if math.abs(v.calculated_fitness - g.calculated_fitness) < config.fitness_threshold then
                     thres = 1
                 end
                 sum = sum + thres
@@ -471,8 +472,45 @@ function new_generation(number_of_genomes, innov)
         return g.calculated_fitness / sum
     end
 
-    function generation:get_average_fitness()
-        
+    function generation:get_adjusted_fitness_average(species_id)
+        local sum = 0
+        local elements = 0
+        for k, v in pairs(generation.genomes) do
+            if v.species_id == species_id then
+                sum = sum + generation:get_adjusted_fitness(v.genome_id)
+                elements = elements + 1
+            end
+        end
+        return sum / elements
+    end
+
+    function generation:get_fitness_average(species_id)
+        local sum = 0
+        local elements = 0
+        for k, v in pairs(generation.genomes) do
+            if v.species_id == species_id then
+                sum = sum + v:get_fitness()
+                elements = elements + 1
+            end
+        end
+        return sum / elements
+    end
+
+    function get_strong_genomes()
+        local function compare(a,b)
+            return a.calculated_fitness > b.calculated_fitness
+        end
+
+        table.sort(gen.genomes, compare)
+        local found_species = {}
+        local new_genome_list = {}
+        for k, v in pairs(gen.genomes) do
+            if not has_value(found_species, v.species_id) then
+                table.insert(new_genome_list, v)
+                table.insert(found_species, v.species_id)
+            end
+        end
+        return new_genome_list
     end
     
     for i = 1, number_of_genomes do
@@ -530,32 +568,50 @@ function draw_info(generation, species, genome, fitness)
     gui.drawtext(x_offset, y_offset + box_size*16+10*3, "fitness: "..fitness, color1, color2)
 end
 
-gen = new_generation(3, 1)
-g1 = gen.genomes[1]
+generations = {}
+
+gen = new_generation(config.pop_size, 1)
+table.insert(generations, gen)
+focus_genome = gen.genomes[1]
 for i=1, 300 do
     for k, v in pairs(gen.genomes) do
         mutate(v)
     end
 end
 gen:check_all_genomes_species()
-print(gen.species_rep)
 
-function test_screen_state()
+function move_genomes(genomes, gen)
+    -- move genomes to new gen
+    for k, v in pairs(genomes) do
+        v.generation_id = gen.innov
+        v.species_id = 1
+        v.genome_id = k
+    end
+    gen.genomes = genomes
+end
+
+function test_next_gen()
     if memory.readbyte(0x0770) == 0 then -- weird solution, i know
         joypad.set(1, {start = true})
         emu.frameadvance()
         joypad.set(1, {start = false})
     end
     
-    if g1:is_dead() then
-        g1.calculated_fitness = g1:get_fitness()
+    if focus_genome:is_dead() then
+        focus_genome.calculated_fitness = focus_genome:get_fitness()
         emu.poweron()
-        if g1.genome_id ~= #gen.genomes then
-            g1 = gen.genomes[g1.genome_id + 1]
+        if focus_genome.genome_id ~= #gen.genomes then
+            focus_genome = gen.genomes[focus_genome.genome_id + 1]
         else
-            for k, v in pairs(gen.genomes) do
-                print(v.genome_id, gen:get_adjusted_fitness(v.genome_id))
+            for i=1, gen.highest_species_id do
+                -- print("spec", i, gen:get_fitness_average(i))
             end
+            local new_genomes = get_strong_genomes()
+            gen = new_generation(#new_genomes, #generations + 1)
+            move_genomes(new_genomes, gen)
+            table.insert(generations, gen)
+            focus_genome = gen.genomes[1]
+            gen:check_all_genomes_species()
         end
     end
 end
@@ -566,12 +622,12 @@ while (true) do
     read_enemies(level)
     display_map(level)
     display_buttons()
-    draw_info(g1.generation_id, g1.species_id, g1.genome_id, g1:get_fitness())
-    g1:draw_connections()
-    g1:draw_hidden()
-    g1:eval(level)
-    g1:set_joypad_val()
-    test_screen_state()
+    draw_info(focus_genome.generation_id, focus_genome.species_id, focus_genome.genome_id, focus_genome:get_fitness())
+    focus_genome:draw_connections()
+    focus_genome:draw_hidden()
+    -- focus_genome:eval(level)
+    focus_genome:set_joypad_val()
+    test_next_gen()
 
     emu.frameadvance()
 end
