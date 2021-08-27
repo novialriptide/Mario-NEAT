@@ -20,6 +20,10 @@ moving_objects = {}
 
 inputs_keys = {"A", "B", "right", "left", "up", "down", "start", "select"}
 
+function get_game_timer()
+    return tonumber(memory.readbyte(0x07F8)..memory.readbyte(0x07F9)..memory.readbyte(0x07FA))
+end
+
 function has_value(tab, val)
     for index, value in ipairs(tab) do
         if value == val then
@@ -280,7 +284,6 @@ function new_genome()
                         sum = sum + val * v.weight
                     end
                 end
-                -- print(sum, sigmoid(sum))
                 v.value = sigmoid(sum)
             end
         end
@@ -289,7 +292,7 @@ function new_genome()
     function genome:set_joypad_val()
         local inputs = {A = nil, B = nil, right = nil, left = nil, up = nil, down = nil, start = nil, select = nil}
         for k, v in pairs(genome.nodes) do
-            if v.type == "OUTPUT" and v.value > 0.9 then
+            if v.type == "OUTPUT" and v.value > 0.9 and v.button ~= "start" then
                 inputs[v.button] = true
             end
         end
@@ -299,7 +302,7 @@ function new_genome()
     end
 
     function genome:get_fitness()
-        local timer = tonumber(memory.readbyte(0x07F8)..memory.readbyte(0x07F9)..memory.readbyte(0x07FA)) / 100
+        local timer = get_game_timer() / 100
         local score = timer + mario_x / 10
         return score
     end
@@ -409,14 +412,14 @@ function new_generation(number_of_genomes, innov)
     end
 
     function generation:check_species(genome_id)
-        -- print("testing genome_id: ".. genome_id)
+        print("testing genome_id: ".. genome_id)
         local g = generation.genomes[genome_id]
         local species_found = false
         if #generation.genomes > 0 and has_value(generation.species_rep, genome_id) == false then
             for k, v in pairs(generation.species_rep) do
                 local other_g = generation:get_genome(v)
                 local species_compatibility = is_same_species(other_g, g)
-                -- print("species rep: "..v..", genome_id: "..g.genome_id..", spec_com: "..species_compatibility)
+                print("species rep: "..v..", genome_id: "..g.genome_id..", spec_com: "..species_compatibility)
 
                 if species_compatibility < config.compatibility_threshold then
                     g.species_id = other_g.species_id
@@ -436,6 +439,7 @@ function new_generation(number_of_genomes, innov)
         for k, v in pairs(generation.genomes) do
             generation:check_species(v.genome_id)
         end
+        print(generation.species_rep, #generation.genomes)
     end
 
     function generation:new_genome()
@@ -444,6 +448,8 @@ function new_generation(number_of_genomes, innov)
         table.insert(generation.genomes, g)
         g.generation_id = generation.innov
         g.genome_id = #generation.genomes
+
+        return g
     end
 
     function generation:get_genome(genome_id)
@@ -472,19 +478,20 @@ function new_generation(number_of_genomes, innov)
         return g.calculated_fitness / sum
     end
 
-    function generation:get_adjusted_fitness_average(species_id)
+    function generation:get_adjusted_fitness_sum(species_id)
         local sum = 0
         local elements = 0
         for k, v in pairs(generation.genomes) do
             if v.species_id == species_id then
                 sum = sum + generation:get_adjusted_fitness(v.genome_id)
+                print(generation:get_adjusted_fitness(v.genome_id))
                 elements = elements + 1
             end
         end
-        return sum / elements
+        return sum
     end
 
-    function generation:get_fitness_average(species_id)
+    function generation:get_fitness_sum(species_id)
         local sum = 0
         local elements = 0
         for k, v in pairs(generation.genomes) do
@@ -525,39 +532,51 @@ function breed(genome1, genome2)
 end
 
 function mutate(genome)
+    local has_mutate_happen = false
     if config.node_add_prob > math.random() then
         genome:add_h_node()
+        has_mutate_happen = true
     end
 
     if config.node_delete_prob > math.random() then
         genome:delete_node(math.random(1, #genome.nodes))
+        has_mutate_happen = true
     end
 
     if config.conn_add_prob > math.random() then
         -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
         if #genome.nodes > 229 and 0.5 > math.random(0, 1) then
             genome:add_connection(math.random(222, #genome.nodes), math.random(230, #genome.nodes))
+            has_mutate_happen = true
         else
             genome:add_connection(math.random(1, #genome.nodes), math.random(222, #genome.nodes))
+            has_mutate_happen = true
         end
     end
 
     if config.conn_delete_prob > math.random() and #genome.connects > 0 then
         genome:remove_connection(math.random(1, #genome.connects))
+        has_mutate_happen = true
     end
 
     for k, v in pairs(genome.connects) do
         if config.weight_mutate_rate > math.random() then
             v.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
+            has_mutate_happen = true
         end
         
         if config.enabled_default and config.enabled_mutate_rate > math.random() then
             if 0.5 > math.random() then
                 v.enabled = true
+                has_mutate_happen = true
             else
                 v.enabled = false
+                has_mutate_happen = true
             end
         end
+    end
+    if not has_mutate_happen then
+        mutate(genome)
     end
 end
 
@@ -573,12 +592,13 @@ generations = {}
 gen = new_generation(config.pop_size, 1)
 table.insert(generations, gen)
 focus_genome = gen.genomes[1]
-for i=1, 300 do
+for i=1, 1 do
     for k, v in pairs(gen.genomes) do
+        v.species_id = k
         mutate(v)
     end
 end
-gen:check_all_genomes_species()
+-- gen:check_all_genomes_species()
 
 function move_genomes(genomes, gen)
     -- move genomes to new gen
@@ -590,33 +610,68 @@ function move_genomes(genomes, gen)
     gen.genomes = genomes
 end
 
+function do_this_when_dead()
+    focus_genome.calculated_fitness = focus_genome:get_fitness()
+    emu.poweron()
+    if focus_genome.genome_id ~= #gen.genomes then
+        focus_genome = gen.genomes[focus_genome.genome_id + 1]
+    else
+        local new_genomes = get_strong_genomes()
+        gen = new_generation(#new_genomes, #generations + 1)
+        move_genomes(new_genomes, gen)
+        table.insert(generations, gen)
+        focus_genome = gen.genomes[1]
+        gen:check_all_genomes_species()
+        for k, v in pairs(gen.species_rep) do 
+            for g=1, gen:get_adjusted_fitness_sum(v) do
+                local wow_genome = gen:new_genome()
+                wow_genome.nodes = gen:get_genome(v).nodes
+                wow_genome.connects = gen:get_genome(v).connects
+                for i=1, 15 do
+                   mutate(wow_genome)
+                end
+            end
+        end
+    end
+end
+
 function test_next_gen()
+    -- force starts game
     if memory.readbyte(0x0770) == 0 then -- weird solution, i know
         joypad.set(1, {start = true})
         emu.frameadvance()
         joypad.set(1, {start = false})
     end
     
+    -- new gen
     if focus_genome:is_dead() then
-        focus_genome.calculated_fitness = focus_genome:get_fitness()
-        emu.poweron()
-        if focus_genome.genome_id ~= #gen.genomes then
-            focus_genome = gen.genomes[focus_genome.genome_id + 1]
-        else
-            for i=1, gen.highest_species_id do
-                -- print("spec", i, gen:get_fitness_average(i))
-            end
-            local new_genomes = get_strong_genomes()
-            gen = new_generation(#new_genomes, #generations + 1)
-            move_genomes(new_genomes, gen)
-            table.insert(generations, gen)
-            focus_genome = gen.genomes[1]
-            gen:check_all_genomes_species()
-        end
+        do_this_when_dead()
     end
 end
 
+is_timer_set = false
+start_timeout = 0
+
+function is_input_dead()
+    local result = true
+    for k, v in pairs(joypad.read(1)) do
+        if v then
+            result = false
+            return result
+        end
+    end
+    return result
+end
+
 while (true) do
+    if is_input_dead() and not is_timer_set and get_game_timer() ~= 0 then
+        is_timer_set = true
+        start_timeout = get_game_timer()
+    end
+    if not is_input_dead() then
+        is_timer_set = false
+    end
+
     get_positions()
     local level = get_map()
     read_enemies(level)
@@ -629,5 +684,10 @@ while (true) do
     focus_genome:set_joypad_val()
     test_next_gen()
 
+    if get_game_timer() <= start_timeout - 5 and is_timer_set then
+        is_timer_set = false
+        do_this_when_dead()
+    end
+    print(#gen.genomes)
     emu.frameadvance()
 end
