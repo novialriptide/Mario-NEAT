@@ -157,7 +157,7 @@ end
 
 function new_node(value, type)
     local node = {
-        innov = 0
+        innov = 0,
         value = value, 
         type = type
     }
@@ -179,7 +179,7 @@ end
 
 function new_generation()
     local generation = {
-
+        species = {}
     }
 
     return generation
@@ -198,7 +198,7 @@ function new_genome(inputs, outputs)
         nodes = {},
         connections = {},
         is_alive = true,
-        num_inputs = inputs
+        num_inputs = inputs,
         num_outputs = outputs
     }
 
@@ -258,29 +258,25 @@ function new_genome(inputs, outputs)
         end
     end
 
-    function genome:eval(level_data)
-        local function genome:get_in_nodes(innov)
-            -- gets all of the nodes that connect to the specific node's input
-            local outputs = {}
-            for k, v in pairs(genome.connects) do
-                if v.node_out == innov and v.enabled then
-                    table.insert(outputs, {innov = v.node_in, weight = v.weight})
-                end
+    function genome:get_in_nodes(innov)
+        -- gets all of the nodes that connect to the specific node's input
+        local outputs = {}
+        for k, v in pairs(genome.connects) do
+            if v.node_out == innov and v.enabled then
+                table.insert(outputs, {innov = v.node_in, weight = v.weight})
             end
-            return outputs
         end
+        return outputs
+    end
 
+    function genome:eval(level_data)
         local nodes = {}
-        for k, v in pairs(map_to_list(level_data)) do
-            table.insert(nodes, new_node(v, "INPUT"))
-        end
-
-        for k, v in pairs(genome.nodes) do
-            table.insert(nodes, v) 
-        end
+        for k, v in pairs(map_to_list(level_data)) do table.insert(nodes, new_node(v, "INPUT")) end
+        for i=1, genome.num_outputs do table.insert(nodes, new_node(0, "OUTPUT")) end
+        for k, v in pairs(genome.nodes) do table.insert(nodes, v) end
 
         local available_nodes = {}
-        for k, v in pairs(genome.nodes) do
+        for k, v in pairs(nodes) do
             if v.type ~= "INPUT" then
                 local in_nodes = genome:get_in_nodes(v.innov)
                 local sum = 0
@@ -288,11 +284,7 @@ function new_genome(inputs, outputs)
                     if genome:does_node_exist(v.innov) then
                         local val = nil
                         local g = genome:get_node(v.innov)
-                        if g.type == "INPUT" then
-                            val = genome:get_i_value(level_data, v.innov)
-                        else
-                            val = g.value
-                        end
+                        val = g.value
 
                         sum = sum + val * v.weight
                     end
@@ -302,14 +294,32 @@ function new_genome(inputs, outputs)
         end
     end
 
+    function genome:set_joypad_val()
+        local inputs = {A = nil, B = nil, right = nil, left = nil, up = nil, down = nil, start = nil, select = nil}
+        for k, v in pairs(genome.nodes) do
+            if v.type == "OUTPUT" and v.value > 0.9 and v.button ~= "start" then
+                inputs[v.button] = true
+            end
+        end
+        joypad.set(1, inputs)
+
+        return inputs
+    end
+
     return genome
 end
+
+focus_genome = nil
+focus_generation = nil
+focus_species = nil
 
 while (true) do
     get_positions()
     local level = get_map()
     read_enemies(level)
     display_map(level)
+
+    focus_genome:eval()
     
     emu.frameadvance()
 end

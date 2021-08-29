@@ -292,7 +292,7 @@ function new_genome()
     function genome:set_joypad_val()
         local inputs = {A = nil, B = nil, right = nil, left = nil, up = nil, down = nil, start = nil, select = nil}
         for k, v in pairs(genome.nodes) do
-            if v.type == "OUTPUT" and v.value > 0.9 and v.button ~= "start" then
+            if v.type == "OUTPUT" and v.value > 0.9 and v.button ~= "start" and v.button ~= "select" then
                 inputs[v.button] = true
             end
         end
@@ -596,6 +596,7 @@ for i=1, 1 do
     for k, v in pairs(gen.genomes) do
         v.species_id = k
         mutate(v)
+        mutate(v)
     end
 end
 -- gen:check_all_genomes_species()
@@ -628,7 +629,8 @@ function do_this_when_dead()
                 wow_genome.nodes = gen:get_genome(v).nodes
                 wow_genome.connects = gen:get_genome(v).connects
                 for i=1, 15 do
-                   mutate(wow_genome)
+                    mutate(wow_genome)
+                    mutate(wow_genome)
                 end
             end
         end
@@ -652,23 +654,16 @@ end
 is_timer_set = false
 start_timeout = 0
 
-function is_input_dead()
-    local result = true
-    for k, v in pairs(joypad.read(1)) do
-        if v then
-            result = false
-            return result
-        end
-    end
-    return result
+function is_not_moving()
+    return 0 == memory.readbyte(0x0057)
 end
 
 while (true) do
-    if is_input_dead() and not is_timer_set and get_game_timer() ~= 0 then
+    if is_not_moving() and not is_timer_set and get_game_timer() ~= 0 then
         is_timer_set = true
         start_timeout = get_game_timer()
     end
-    if not is_input_dead() then
+    if not is_not_moving() then
         is_timer_set = false
     end
 
@@ -680,7 +675,7 @@ while (true) do
     draw_info(focus_genome.generation_id, focus_genome.species_id, focus_genome.genome_id, focus_genome:get_fitness())
     focus_genome:draw_connections()
     focus_genome:draw_hidden()
-    -- focus_genome:eval(level)
+    focus_genome:eval(level)
     focus_genome:set_joypad_val()
     test_next_gen()
 
