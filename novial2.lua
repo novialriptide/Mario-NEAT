@@ -20,6 +20,10 @@ moving_objects = {}
 
 inputs_keys = {"A", "B", "right", "left", "up", "down", "start", "select"}
 
+function sigmoid(x)
+    return 1 / (1 + math.pow(2.71828, -x))
+end
+
 function get_game_timer()
     return tonumber(memory.readbyte(0x07F8)..memory.readbyte(0x07F9)..memory.readbyte(0x07FA))
 end
@@ -31,6 +35,17 @@ function has_value(tab, val)
         end
     end
     return false
+end
+
+function draw_buttons()
+    for k, v in pairs(inputs_keys) do
+        local _inputs = joypad.read(1)
+        if _inputs[v] then
+            gui.drawtext(210, y_offset + (k-1)*10, v, color1, color2)
+        else
+            gui.drawtext(210, y_offset + (k-1)*10, v, color2, color2)
+        end
+    end
 end
 
 function get_positions()
@@ -141,11 +156,11 @@ function read_enemies(level)
         end
     end
 end
-
-global_connects = {}
+connect_gene_innov = 1
+global_connections = {}
 
 function map_to_list(level_data)
-    map_list = {}
+    local map_list = {}
     for r=1, 12 do
         for c=1, 16 do
             table.insert(map_list, level_data[r][c])
@@ -155,12 +170,29 @@ function map_to_list(level_data)
     return map_list
 end
 
+function element_to_screen(element)
+    return {x = element % 16, y = element / 16}
+end
+
+function random_screen_coords()
+    return {x = math.random(14*4 + 30, 210 - 50), y = math.random(20 + 10, 20 + 16*4 - 10)}
+end
+
 function new_node(value, type)
     local node = {
         innov = 0,
         value = value, 
         type = type
     }
+
+    if type == "INPUT" then
+        local coords = element_to_screen(innov)
+    else
+        local coords = random_screen_coords()
+    end
+    
+    node.x = coords.x
+    node.y = coords.y
 
     return node
 end
@@ -202,7 +234,15 @@ function new_genome(inputs, outputs)
         num_outputs = outputs
     }
 
-    function genome:get_node(innov)
+    function genome:get_node(innov, level_data)
+        if innov <= num_inputs then
+            return level_data[innov]
+        end
+
+        if num_inputs <= innov <= num_outputs then
+            return 
+        end
+
         for k, v in pairs(genome.nodes) do 
             if v.innov == innov then
                 return v
@@ -211,7 +251,7 @@ function new_genome(inputs, outputs)
     end
 
     function genome:does_node_exist(innov)
-        return not genome:get_node(innov) == nil
+        return not (innov <= genome.num_inputs + genome.num_outputs) or genome:get_node(innov) == nil
     end
 
     function genome:add_node()
@@ -230,43 +270,43 @@ function new_genome(inputs, outputs)
         local connect_node = new_connection(node1, node2, math.random(config.weight_min_value, config.weight_max_value))
         -- must add a try except thing to cover nodes that dont exist
         if genome:does_node_exist(node1) and genome:does_node_exist(node2) then
-            for k, v in pairs(global_connects) do
+            for k, v in pairs(global_connections) do
                 if connect_node.node_in == v.node_in and connect_node.node_out == v.node_out then
-                    for k, v in pairs(genome.connects) do
+                    for k, v in pairs(genome.connections) do
                         if v == connect_node then
                             return
                         end
                     end        
                     connect_node.innov = v.innov
-                    table.insert(genome.connects, connect_node)
+                    table.insert(genome.connections, connect_node)
                     return
                 end
             end
             connect_node.innov = connect_gene_innov
             connect_gene_innov = connect_gene_innov + 1
 
-            table.insert(global_connects, connect_node)
-            table.insert(genome.connects, connect_node)
+            table.insert(global_connections, connect_node)
+            table.insert(genome.connections, connect_node)
         end
     end
 
     function genome:remove_connection(innov)
-        for k, v in pairs(genome.connects) do
+        for k, v in pairs(genome.connections) do
             if innov == v.innov then
-                table.remove(genome.connects, k)
+                table.remove(genome.connections, k)
             end
         end
     end
 
     function genome:get_in_nodes(innov)
         -- gets all of the nodes that connect to the specific node's input
-        local outputs = {}
-        for k, v in pairs(genome.connects) do
+        local results = {}
+        for k, v in pairs(genome.connections) do
             if v.node_out == innov and v.enabled then
-                table.insert(outputs, {innov = v.node_in, weight = v.weight})
+                table.insert(results, {innov = v.node_in, weight = v.weight})
             end
         end
-        return outputs
+        return results
     end
 
     function genome:eval(level_data)
@@ -306,12 +346,32 @@ function new_genome(inputs, outputs)
         return inputs
     end
 
+    function genome:draw_connections()
+        for k, v in pairs(genome.connections) do
+            print(v)
+            if genome:does_node_exist(v.node_in) and genome:does_node_exist(v.node_out) and v.enabled then
+                local node_in = genome:get_node(v.node_in)
+                local node_out = genome:get_node(v.node_out)
+                gui.drawline(node_in.x, node_in.y, node_out.x+box_size/2, node_out.y+box_size/2, color3)
+            end
+        end
+    end
+
+    function genome:draw_nodes()
+        for k, v in pairs(genome.nodes) do
+            draw_world_tile(v.x, v.y, color1, color2)
+        end
+    end
+
     return genome
 end
 
-focus_genome = nil
+focus_genome = new_genome(12*16, 6)
 focus_generation = nil
 focus_species = nil
+
+focus_genome:add_connection(1, 12*16+1)
+focus_genome:add_connection(2, 12*16+1)
 
 while (true) do
     get_positions()
@@ -319,7 +379,10 @@ while (true) do
     read_enemies(level)
     display_map(level)
 
-    focus_genome:eval()
+    focus_genome:draw_connections()
+    focus_genome:draw_nodes()
+    focus_genome:eval(level)
+    draw_buttons()
     
     emu.frameadvance()
 end
