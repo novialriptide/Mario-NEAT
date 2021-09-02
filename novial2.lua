@@ -234,12 +234,12 @@ function new_genome(inputs, outputs)
         num_outputs = outputs
     }
 
-    function genome:get_node(innov, level_data)
-        if innov <= num_inputs then
-            return level_data[innov]
+    function genome:get_node(innov)
+        if innov <= genome.num_inputs then
+            return level[innov]
         end
 
-        if num_inputs <= innov <= num_outputs then
+        if genome.num_inputs <= innov <= genome.num_outputs then
             return 
         end
 
@@ -332,12 +332,17 @@ function new_genome(inputs, outputs)
                 v.value = sigmoid(sum)
             end
         end
-    end
 
-    function genome:set_joypad_val()
+        local output_nodes = {}
+        for k, v in pairs(nodes) do
+            if v.type == "OUTPUT" then
+                table.insert(output_nodes, v)
+            end
+        end
+
         local inputs = {A = nil, B = nil, right = nil, left = nil, up = nil, down = nil, start = nil, select = nil}
-        for k, v in pairs(genome.nodes) do
-            if v.type == "OUTPUT" and v.value > 0.9 and v.button ~= "start" then
+        for k, v in pairs(output_nodes) do
+            if v.value > 0.9 and v.button ~= "start" then
                 inputs[v.button] = true
             end
         end
