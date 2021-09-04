@@ -37,17 +37,6 @@ function has_value(tab, val)
     return false
 end
 
-function draw_buttons()
-    for k, v in pairs(inputs_keys) do
-        local _inputs = joypad.read(1)
-        if _inputs[v] then
-            gui.drawtext(210, y_offset + (k-1)*10, v, color1, color2)
-        else
-            gui.drawtext(210, y_offset + (k-1)*10, v, color2, color2)
-        end
-    end
-end
-
 function get_positions()
     mario_x = memory.readbyte(0x0086) + memory.readbyte(0x006D) * 256
     mario_y = memory.readbyte(0x03B8)
@@ -73,9 +62,9 @@ function get_map()
     local c_row = 1
     x_start = (memory.readbyte(0x006D) * 256 + memory.readbyte(0x0086)) - memory.readbyte(0x03AD)
     
-    for _y=32, 224, 16 do
+    for _y=32, 224, 16 do -- 12
         level_map[c_row] = {}
-        for _x=-16, 240, 16 do
+        for _x=0, 256, 16 do -- 16
             local tile = get_tile(_x, _y)
             if tile == 1 then
                 local x_gui = math.floor(_x/16) - 1
@@ -96,14 +85,14 @@ function get_map()
     end
     return level_map
 end
-level = get_map()
+ai_inputs = get_map()
 
 function draw_world_tile(x, y, color1, color2)
     local x = x - 2
     gui.drawbox(x, y, x+box_size, y+box_size, color2, color1)
 end
 
-function display_map(level)
+function draw_map(level)
     local function draw_tile(x, y, color1, color2)
         local x = x - 2
         gui.drawbox(x_offset+x*box_size, y_offset+y*box_size, x_offset+x*box_size+box_size, y_offset+y*box_size+box_size, color2, color1)
@@ -118,26 +107,6 @@ function display_map(level)
             if level[y][x] >= 3 then draw_tile(x, y, color4, color4) end
         end
     end
-end
-
-function cell_to_screen(x, y)
-    local x = x - 2
-    return {x = x_offset+x*box_size, y = y_offset+(y-0)*box_size}
-end
-
-function display_buttons()
-    for k, v in pairs(inputs_keys) do
-        local _inputs = joypad.read(1)
-        if _inputs[v] then
-            gui.drawtext(210, y_offset + (k-1)*10, v, color1, color2)
-        else
-            gui.drawtext(210, y_offset + (k-1)*10, v, color2, color2)
-        end
-    end
-end
-
-function get_button_coords(button_number)
-    return {x = 210, y = y_offset + (button_number-1)*10}
 end
 
 function read_enemies(level)
@@ -156,14 +125,26 @@ function read_enemies(level)
         end
     end
 end
+
+function draw_buttons()
+    for k, v in pairs(inputs_keys) do
+        local _inputs = joypad.read(1)
+        if _inputs[v] then
+            gui.drawtext(210, y_offset + (k-1)*10, v, color1, color2)
+        else
+            gui.drawtext(210, y_offset + (k-1)*10, v, color2, color2)
+        end
+    end
+end
+
 connect_gene_innov = 1
 global_connections = {}
 
 function map_to_list(level_data)
     local map_list = {}
-    for r=1, 12 do
-        for c=1, 16 do
-            table.insert(map_list, level_data[r][c])
+    for r=1, #level_data do
+        for c=1, #level_data[r] do
+            table.insert(map_list, {value = level_data[r][c], x = c, y = r})
         end
     end
 
@@ -171,29 +152,41 @@ function map_to_list(level_data)
 end
 
 function element_to_screen(element)
-    return {x = element % 16, y = element / 16}
+    return {x = (element-1) % 17 + 1, y = math.floor((element-1) / 17) + 1}
+end
+
+function cell_to_screen(x, y)
+    return {x = x_offset - box_size/2 + box_size*(x-1), y = y_offset - box_size/2 + box_size*(y-1)}
 end
 
 function random_screen_coords()
-    return {x = math.random(14*4 + 30, 210 - 50), y = math.random(20 + 10, 20 + 16*4 - 10)}
+    return {x = math.random(14*4 + 30, 210 - 50), y = math.random(20 + 10, 50 + 16*4 - 10)}
 end
 
-function new_node(value, type)
+function get_button_coords(button_number)
+    return {x = 210, y = y_offset + (button_number-1)*10}
+end
+
+function new_node(value, type, innov)
     local node = {
-        innov = 0,
+        innov = innov,
         value = value, 
-        type = type
+        type = type,
+        x = 0,
+        y = 0
     }
 
-    if type == "INPUT" then
-        local coords = element_to_screen(innov)
-    else
-        local coords = random_screen_coords()
+    local coords = {}
+    if type == "HIDDEN" then
+        coords = random_screen_coords()
+    end
+    if type == "OUTPUT" then
+        coords = get_button_coords(innov - config.num_inputs)
     end
     
     node.x = coords.x
     node.y = coords.y
-
+    
     return node
 end
 
@@ -225,25 +218,38 @@ function new_species()
     return species
 end
 
-function new_genome(inputs, outputs)
+function new_genome()
     local genome = {
-        nodes = {},
+        hidden_nodes = {},
         connections = {},
-        is_alive = true,
-        num_inputs = inputs,
-        num_outputs = outputs
+        is_alive = true
     }
+    
+    function genome:get_nodes()
+        local nodes = {}
+        local _innov = 0
+        for k, v in pairs(map_to_list(ai_inputs)) do 
+            _innov = _innov + 1
+            local _node = new_node(v.value, "INPUT", _innov)
+            _node.x = v.x
+            _node.y = v.y
+            table.insert(nodes, _node)
+        end
+        for k, v in pairs(inputs_keys) do
+            _innov = _innov + 1
+            table.insert(nodes, new_node(0, "OUTPUT", _innov))
+        end
+        for k, v in pairs(genome.hidden_nodes) do
+            _innov = _innov + 1
+            v.innov = _innov
+            table.insert(nodes, v)
+        end
+
+        return nodes
+    end
 
     function genome:get_node(innov)
-        if innov <= genome.num_inputs then
-            return level[innov]
-        end
-
-        if genome.num_inputs <= innov <= genome.num_outputs then
-            return 
-        end
-
-        for k, v in pairs(genome.nodes) do 
+        for k, v in pairs(genome:get_nodes()) do 
             if v.innov == innov then
                 return v
             end
@@ -251,17 +257,17 @@ function new_genome(inputs, outputs)
     end
 
     function genome:does_node_exist(innov)
-        return not (innov <= genome.num_inputs + genome.num_outputs) or genome:get_node(innov) == nil
+        return genome:get_node(innov) ~= nil
     end
 
     function genome:add_node()
-        table.insert(genome.nodes, new_node(0, "HIDDEN"))
+        table.insert(genome.hidden_nodes, new_node(0, "HIDDEN"))
     end
 
     function genome:delete_node(innov)
-        for k, v in pairs(genome.nodes) do
+        for k, v in pairs(genome.hidden_nodes) do
             if innov == v.innov then
-                table.remove(genome.nodes, k)
+                table.remove(genome.hidden_nodes, k)
             end
         end
     end
@@ -288,6 +294,7 @@ function new_genome(inputs, outputs)
             table.insert(global_connections, connect_node)
             table.insert(genome.connections, connect_node)
         end
+        -- print(genome.connections)
     end
 
     function genome:remove_connection(innov)
@@ -309,11 +316,8 @@ function new_genome(inputs, outputs)
         return results
     end
 
-    function genome:eval(level_data)
-        local nodes = {}
-        for k, v in pairs(map_to_list(level_data)) do table.insert(nodes, new_node(v, "INPUT")) end
-        for i=1, genome.num_outputs do table.insert(nodes, new_node(0, "OUTPUT")) end
-        for k, v in pairs(genome.nodes) do table.insert(nodes, v) end
+    function genome:eval()
+        local nodes = genome:get_nodes()
 
         local available_nodes = {}
         for k, v in pairs(nodes) do
@@ -339,11 +343,12 @@ function new_genome(inputs, outputs)
                 table.insert(output_nodes, v)
             end
         end
-
-        local inputs = {A = nil, B = nil, right = nil, left = nil, up = nil, down = nil, start = nil, select = nil}
+        
+        local inputs = {}
+        local inputs_keys = {"A", "B", "right", "left", "up", "down", "start", "select"}
         for k, v in pairs(output_nodes) do
-            if v.value > 0.9 and v.button ~= "start" then
-                inputs[v.button] = true
+            if v.value > 0.9 then
+                inputs[inputs_keys[k]] = true
             end
         end
         joypad.set(1, inputs)
@@ -353,17 +358,20 @@ function new_genome(inputs, outputs)
 
     function genome:draw_connections()
         for k, v in pairs(genome.connections) do
-            print(v)
             if genome:does_node_exist(v.node_in) and genome:does_node_exist(v.node_out) and v.enabled then
                 local node_in = genome:get_node(v.node_in)
                 local node_out = genome:get_node(v.node_out)
-                gui.drawline(node_in.x, node_in.y, node_out.x+box_size/2, node_out.y+box_size/2, color3)
+                if node_in.type == "INPUT" then
+                    print(node_in)
+                    local converted_coords = cell_to_screen(node_in.x, node_in.y)
+                    gui.drawline(converted_coords.x, converted_coords.y, node_out.x+box_size/2, node_out.y+box_size/2, color3)
+                end
             end
         end
     end
 
     function genome:draw_nodes()
-        for k, v in pairs(genome.nodes) do
+        for k, v in pairs(genome.hidden_nodes) do
             draw_world_tile(v.x, v.y, color1, color2)
         end
     end
@@ -371,22 +379,26 @@ function new_genome(inputs, outputs)
     return genome
 end
 
-focus_genome = new_genome(12*16, 6)
+focus_genome = new_genome()
 focus_generation = nil
 focus_species = nil
 
-focus_genome:add_connection(1, 12*16+1)
-focus_genome:add_connection(2, 12*16+1)
+focus_genome:add_connection(13*17, 13*17+1)
+focus_genome:add_connection(1, 13*17+1)
+focus_genome:add_node()
+focus_genome:add_node()
+
+print(focus_genome:get_nodes())
 
 while (true) do
     get_positions()
-    local level = get_map()
-    read_enemies(level)
-    display_map(level)
+    ai_inputs = get_map()
+    read_enemies(ai_inputs)
+    draw_map(ai_inputs)
 
     focus_genome:draw_connections()
     focus_genome:draw_nodes()
-    focus_genome:eval(level)
+    focus_genome:eval()
     draw_buttons()
     
     emu.frameadvance()
