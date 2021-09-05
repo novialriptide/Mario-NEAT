@@ -88,7 +88,6 @@ end
 ai_inputs = get_map()
 
 function draw_world_tile(x, y, color1, color2)
-    local x = x - 2
     gui.drawbox(x, y, x+box_size, y+box_size, color2, color1)
 end
 
@@ -99,7 +98,7 @@ function draw_map(level)
     end
     local columns = 16
     local rows = 14
-    gui.drawbox(x_offset-box_size, y_offset-box_size, x_offset+columns*box_size, y_offset+rows*box_size, color2, color2)
+    gui.drawbox(x_offset-box_size, y_offset+box_size, x_offset+columns*box_size, y_offset+rows*box_size, color2, color2)
     for y=1, table.getn(level), 1 do
         for x=1, table.getn(level[y]), 1 do
             if level[y][x] == 1 then draw_tile(x, y, color1, color2) end
@@ -156,7 +155,8 @@ function element_to_screen(element)
 end
 
 function cell_to_screen(x, y)
-    return {x = x_offset - box_size/2 + box_size*(x-1), y = y_offset - box_size/2 + box_size*(y-1)}
+    return {x = x_offset+(x-2)*box_size + box_size/2, y = y_offset+(y-0)*box_size + box_size/2}
+    -- return {x = x_offset - box_size/2 + box_size*(x-1), y = y_offset - box_size/2 + box_size*(y-1)}
 end
 
 function random_screen_coords()
@@ -165,6 +165,55 @@ end
 
 function get_button_coords(button_number)
     return {x = 210, y = y_offset + (button_number-1)*10}
+end
+
+function mutate(genome)
+    local has_mutate_happen = false
+    if config.node_add_prob > math.random() then
+        genome:add_node()
+        has_mutate_happen = true
+    end
+
+    if config.node_delete_prob > math.random() then
+        genome:delete_node(math.random(1, #genome:get_nodes()))
+        has_mutate_happen = true
+    end
+
+    if config.conn_add_prob > math.random() then
+        -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
+        if #genome:get_nodes() > 13*17+8 and 0.5 > math.random(0, 1) then
+            genome:add_connection(math.random(13*17+1, #genome:get_nodes()), math.random(13*17+8+1, #genome:get_nodes()))
+            has_mutate_happen = true
+        else
+            genome:add_connection(math.random(1, #genome:get_nodes()), math.random(13*17+1, #genome:get_nodes()))
+            has_mutate_happen = true
+        end
+    end
+
+    if config.conn_delete_prob > math.random() and #genome.connections > 0 then
+        genome:remove_connection(math.random(1, #genome.connections))
+        has_mutate_happen = true
+    end
+
+    for k, v in pairs(genome.connections) do
+        if config.weight_mutate_rate > math.random() then
+            v.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
+            has_mutate_happen = true
+        end
+        
+        if config.enabled_default and config.enabled_mutate_rate > math.random() then
+            if 0.5 > math.random() then
+                v.enabled = true
+                has_mutate_happen = true
+            else
+                v.enabled = false
+                has_mutate_happen = true
+            end
+        end
+    end
+    if not has_mutate_happen then
+        mutate(genome)
+    end
 end
 
 function new_node(value, type, innov)
@@ -200,22 +249,6 @@ function new_connection(node1, node2, weight)
     }
     
     return connection
-end
-
-function new_generation()
-    local generation = {
-        species = {}
-    }
-
-    return generation
-end
-
-function new_species()
-    local species = {
-        genomes = {}
-    }
-
-    return species
 end
 
 function new_genome()
@@ -362,7 +395,6 @@ function new_genome()
                 local node_in = genome:get_node(v.node_in)
                 local node_out = genome:get_node(v.node_out)
                 if node_in.type == "INPUT" then
-                    print(node_in)
                     local converted_coords = cell_to_screen(node_in.x, node_in.y)
                     gui.drawline(converted_coords.x, converted_coords.y, node_out.x+box_size/2, node_out.y+box_size/2, color3)
                 end
@@ -379,16 +411,47 @@ function new_genome()
     return genome
 end
 
-focus_genome = new_genome()
-focus_generation = nil
+function new_species()
+    local species = {
+        genomes = {}
+    }
+
+    return species
+end
+
+function new_generation(population_size)
+    local generation = {
+        population_size = population_size,
+        species = {}
+    }
+
+    function generation:check_species(genome, species_innov)
+        -- in this function, make it so that it checks the species compatibility 
+        -- with others and finds the which is the closest to the threshold value 
+        -- in the config.lua file. if it has found two same closest distances,
+        -- then it will choose a random species to be assigned
+    end
+
+    return generation
+end
+
+function new_inital_generation(population_size)
+    local generation = new_generation(population_size)
+
+    for i=1, population_size do
+        local genome = new_genome()
+        table.insert(generation.species, new_species())
+        mutate(genome)
+        table.insert(generation.species[i].genomes, genome)
+    end
+
+    return generation
+end
+
+focus_generation = new_inital_generation(config.pop_size)
+print(focus_generation)
 focus_species = nil
-
-focus_genome:add_connection(13*17, 13*17+1)
-focus_genome:add_connection(1, 13*17+1)
-focus_genome:add_node()
-focus_genome:add_node()
-
-print(focus_genome:get_nodes())
+focus_genome = focus_generation.species[1].genomes[1]
 
 while (true) do
     get_positions()
@@ -401,5 +464,6 @@ while (true) do
     focus_genome:eval()
     draw_buttons()
     
+    gui.drawtext(0, 220, "developed by novial // andrew hong", color1, color2)
     emu.frameadvance()
 end

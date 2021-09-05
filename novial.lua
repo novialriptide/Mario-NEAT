@@ -595,8 +595,8 @@ focus_genome = gen.genomes[1]
 for i=1, 1 do
     for k, v in pairs(gen.genomes) do
         v.species_id = k
-        mutate(v)
-        mutate(v)
+        -- mutate(v)
+        -- mutate(v)
     end
 end
 -- gen:check_all_genomes_species()

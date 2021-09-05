@@ -14,7 +14,7 @@ config = {
     reset_on_extinction   = 0,
 
     -- [DefaultGenome]
-    num_inputs              = 12*16,
+    num_inputs              = 13*17,
     num_hidden              = 1,
     num_outputs             = 1,
     -- initial_connection      = partial_direct 0.5
