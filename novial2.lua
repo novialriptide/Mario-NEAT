@@ -1,6 +1,7 @@
 config = require("config")
 
 math.randomseed(os.time())
+math.random(); math.random(); math.random()
 
 box_size = 4
 
@@ -14,6 +15,10 @@ color4 = 0xAA0000FF
 
 mario_x = 0
 mario_y = 0
+
+mario_map_x = 0
+mario_map_y = 0
+
 mario_x_screen_scroll = 0
 
 moving_objects = {}
@@ -78,11 +83,8 @@ function get_map()
         c_col = 1
         c_row = c_row + 1
     end
-    local mario_map_x = 8
-    local mario_map_y = math.floor(memory.readbyte(0x00CE) / 16)
-    if mario_map_x > 0 and mario_map_x < table.getn(level_map[1]) and mario_map_y > 0 and mario_map_y < table.getn(level_map) then
-        level_map[mario_map_y][mario_map_x] = 2
-    end
+    mario_map_x = 8
+    mario_map_y = math.floor(memory.readbyte(0x00CE) / 16)
     return level_map
 end
 ai_inputs = get_map()
@@ -99,10 +101,12 @@ function draw_map(level)
     local columns = 16
     local rows = 14
     gui.drawbox(x_offset-box_size, y_offset+box_size, x_offset+columns*box_size, y_offset+rows*box_size, color2, color2)
+    if mario_map_x > 0 and mario_map_x < table.getn(level[1]) and mario_map_y > 0 and mario_map_y < table.getn(level) then
+        draw_tile(mario_map_x, mario_map_y, color3, color3)
+    end
     for y=1, table.getn(level), 1 do
         for x=1, table.getn(level[y]), 1 do
             if level[y][x] == 1 then draw_tile(x, y, color1, color2) end
-            if level[y][x] == 2 then draw_tile(x, y, color3, color3) end
             if level[y][x] >= 3 then draw_tile(x, y, color4, color4) end
         end
     end
@@ -119,7 +123,7 @@ function read_enemies(level)
             local s_ex = math.floor(ex/16)
             local s_ey = math.floor(ey/16)
             if s_ex > 0 and s_ex < table.getn(level[1]) and s_ey > 0 and s_ey < table.getn(level) then
-                level[s_ey][s_ex] = 3 + memory.readbyte(0x0016 + _e)
+                level[s_ey][s_ex] = 3 + 1 / memory.readbyte(0x0016 + _e)
             end
         end
     end
@@ -167,53 +171,51 @@ function get_button_coords(button_number)
     return {x = 210, y = y_offset + (button_number-1)*10}
 end
 
-function mutate(genome)
-    local has_mutate_happen = false
-    if config.node_add_prob > math.random() then
-        genome:add_node()
-        has_mutate_happen = true
-    end
 
-    if config.node_delete_prob > math.random() then
-        genome:delete_node(math.random(1, #genome:get_nodes()))
-        has_mutate_happen = true
-    end
-
-    if config.conn_add_prob > math.random() then
-        -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
-        if #genome:get_nodes() > 13*17+8 and 0.5 > math.random(0, 1) then
-            genome:add_connection(math.random(13*17+1, #genome:get_nodes()), math.random(13*17+8+1, #genome:get_nodes()))
-            has_mutate_happen = true
-        else
-            genome:add_connection(math.random(1, #genome:get_nodes()), math.random(13*17+1, #genome:get_nodes()))
-            has_mutate_happen = true
-        end
-    end
-
-    if config.conn_delete_prob > math.random() and #genome.connections > 0 then
-        genome:remove_connection(math.random(1, #genome.connections))
-        has_mutate_happen = true
-    end
-
-    for k, v in pairs(genome.connections) do
-        if config.weight_mutate_rate > math.random() then
-            v.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
-            has_mutate_happen = true
+function is_same_species(genome1, genome2)
+    local diff_genes = {}
+    local function check(t1, t2)
+        local function has_value(table, value)
+            for k, v in pairs(table) do
+                if v.innov == value then
+                    return true
+                end
+            end
+            return false
         end
         
-        if config.enabled_default and config.enabled_mutate_rate > math.random() then
-            if 0.5 > math.random() then
-                v.enabled = true
-                has_mutate_happen = true
-            else
-                v.enabled = false
-                has_mutate_happen = true
+        for k, v in pairs(t1.connections) do
+            if has_value(t2.connections, v.innov) == false then
+                table.insert(diff_genes, v)
             end
         end
     end
-    if not has_mutate_happen then
-        mutate(genome)
+
+    local function get_average_weight(genome)
+        local average = 0
+        for k, v in pairs(genome.connections) do 
+            average = average + v.weight
+        end
+        if #genome.connections == 0 then
+            return 0
+        else
+            return average / #genome.connections
+        end
     end
+
+    check(genome1, genome2)
+    check(genome2, genome1)
+    
+    local N = #genome1.connections
+    if #genome1.connections < #genome2.connections then
+        N = #genome2.connections
+    end
+    if #genome1.connections < 20 and #genome2.connections < 20 then
+        N = 1
+    end
+    
+    local eqtn = ((#diff_genes) / N) + (get_average_weight(genome1) - get_average_weight(genome2))
+    return eqtn
 end
 
 function new_node(value, type, innov)
@@ -255,7 +257,8 @@ function new_genome()
     local genome = {
         hidden_nodes = {},
         connections = {},
-        is_alive = true
+        is_alive = true,
+        calculated_fitness = 0
     }
     
     function genome:get_nodes()
@@ -306,7 +309,7 @@ function new_genome()
     end
 
     function genome:add_connection(node1, node2)
-        local connect_node = new_connection(node1, node2, math.random(config.weight_min_value, config.weight_max_value))
+        local connect_node = new_connection(node1, node2, math.random(config.weight_min_value, config.weight_max_value) + math.random())
         -- must add a try except thing to cover nodes that dont exist
         if genome:does_node_exist(node1) and genome:does_node_exist(node2) then
             for k, v in pairs(global_connections) do
@@ -327,7 +330,6 @@ function new_genome()
             table.insert(global_connections, connect_node)
             table.insert(genome.connections, connect_node)
         end
-        -- print(genome.connections)
     end
 
     function genome:remove_connection(innov)
@@ -335,6 +337,61 @@ function new_genome()
             if innov == v.innov then
                 table.remove(genome.connections, k)
             end
+        end
+    end
+
+    function genome:mutate()
+        local has_mutate_happen = false
+        if config.node_delete_prob > math.random() then
+            if #genome.hidden_nodes ~= 0 or #genome.connections ~= 0 then
+                genome:delete_node(math.random(1, #genome:get_nodes()))
+                has_mutate_happen = true
+            end
+        end
+
+        if config.node_add_prob > math.random() then
+            if #genome.connections ~= 0 then
+                genome:add_node()
+                has_mutate_happen = true
+            end
+        end
+    
+        if config.conn_delete_prob > math.random() and #genome.connections > 0 then
+            if #genome.hidden_nodes ~= 0 or #genome.connections ~= 0 then
+                genome:remove_connection(math.random(1, #genome.connections))
+                has_mutate_happen = true
+            end
+        end
+    
+        if config.conn_add_prob > math.random() then
+            -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
+            if #genome:get_nodes() > 13*17+8 and 0.5 > math.random(0, 1) then
+                genome:add_connection(math.random(13*17+1, #genome:get_nodes()), math.random(13*17+8+1, #genome:get_nodes()))
+                has_mutate_happen = true
+            else
+                genome:add_connection(math.random(1, #genome:get_nodes()), math.random(13*17+1, #genome:get_nodes()))
+                has_mutate_happen = true
+            end
+        end
+    
+        for k, v in pairs(genome.connections) do
+            if config.weight_mutate_rate > math.random() then
+                v.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
+                has_mutate_happen = true
+            end
+            
+            if config.enabled_default and config.enabled_mutate_rate > math.random() then
+                if 0.5 > math.random() then
+                    v.enabled = true
+                    has_mutate_happen = true
+                else
+                    v.enabled = false
+                    has_mutate_happen = true
+                end
+            end
+        end
+        if not has_mutate_happen then
+            genome:mutate()
         end
     end
 
@@ -384,6 +441,8 @@ function new_genome()
                 inputs[inputs_keys[k]] = true
             end
         end
+        inputs["start"] = nil
+        inputs["select"] = nil
         joypad.set(1, inputs)
 
         return inputs
@@ -408,7 +467,21 @@ function new_genome()
         end
     end
 
+    function genome:get_fitness()
+        local timer = get_game_timer() / 100
+        local score = timer + mario_x / 10
+        return score
+    end
+
     return genome
+end
+
+function copy_genome(genome)
+    local g = new_genome()
+    g.hidden_nodes = genome.hidden_nodes
+    g.connections = genome.connections
+
+    return g
 end
 
 function new_species()
@@ -416,44 +489,275 @@ function new_species()
         genomes = {}
     }
 
+    function species:mutate_genomes()
+        for k, v in pairs(species.genomes) do
+            v:mutate()
+        end
+    end
+
+    function species:species_eval(genome)
+        return is_same_species(genome, species.genomes[1])
+    end
+
+    function species:get_average_fitness()
+        local sum = 0
+        for k, v in pairs(species.genomes) do
+            sum = sum + v.calculated_fitness
+        end
+
+        return sum / #genomes
+    end
+
+    function species:get_adjusted_fitness(genome_key)
+        local g = species.genomes[genome_key]
+        local sum = 0
+        for k, v in pairs(species.genomes) do
+            if k ~= genome_key then
+                local thres = 0
+                if math.abs(v.calculated_fitness - g.calculated_fitness) > config.fitness_threshold then
+                    thres = 0
+                end
+                if math.abs(v.calculated_fitness - g.calculated_fitness) < config.fitness_threshold then
+                    thres = 1
+                end
+                sum = sum + thres
+            end
+        end
+        return g.calculated_fitness / sum
+    end
+
+    function species:get_adjusted_fitness_sum()
+        local sum = 0
+        for k, v in pairs(species.genomes) do
+            sum = sum + species:get_adjusted_fitness(k)
+        end
+
+        return sum
+    end
+
+    function species:get_fitness_sum()
+        local sum = 0
+        for k, v in pairs(species.genomes) do
+            sum = sum + species.genomes[k]:get_fitness()
+        end
+
+        return sum
+    end
+
+    function species:sort_genomes()
+        local function compare(a,b)
+            return a.calculated_fitness > b.calculated_fitness
+        end
+
+        table.sort(species.genomes, compare)
+    end
+
     return species
 end
+
+generations = {}
 
 function new_generation(population_size)
     local generation = {
         population_size = population_size,
-        species = {}
+        species = {},
+        unspecified_genomes = {}
     }
 
-    function generation:check_species(genome, species_innov)
+    function generation:mutate_genomes()
+        print("Mutating...")
+        for k, v in pairs(generation.species) do
+            v:mutate_genomes()
+        end
+        print("Mutation Complete!")
+    end
+
+    function generation:_find_species(genome)
         -- in this function, make it so that it checks the species compatibility 
         -- with others and finds the which is the closest to the threshold value 
         -- in the config.lua file. if it has found two same closest distances,
         -- then it will choose a random species to be assigned
+        local function new_species_data(species_innov, species_dis)
+            return {species_innov = species_innov, species_dis = species_dis}
+        end
+
+        local search_results = {}
+        for k, v in pairs(generation.species) do
+            if v:species_eval(genome) < config.compatibility_threshold then
+                table.insert(search_results, new_species_data(k, v:species_eval(genome)))
+            end
+        end        
+        
+        local function compare(a,b)
+            return a.species_dis > b.species_dis
+        end
+
+        table.sort(search_results, compare)
+        if next(search_results) then
+            table.insert(generation.species[search_results[1].species_innov].genomes, genome)
+        end
+        if not next(search_results) then
+            local species = new_species()
+            table.insert(species.genomes, genome)
+            table.insert(generation.species, species)
+            print("new species found")
+        end
     end
 
+    function generation:find_all_species()
+        for k, v in pairs(generation.unspecified_genomes) do
+            generation:_find_species(v)
+        end
+
+        generation.unspecified_genomes = {}
+    end
+
+    function generation:get_population_size()
+        local pop = 0
+        for k, v in pairs(generation.species) do
+            pop = pop + #v.genomes
+        end
+
+        return pop
+    end
+
+    function generation:get_adjusted_fitness_sum()
+        local sum = 0
+        for k, v in pairs(generation.species) do
+            sum = sum + v:get_adjusted_fitness_sum()
+        end
+
+        return sum
+    end
+
+    table.insert(generations, generation)
     return generation
+end
+
+function copy_generation(generation)
+    local g = new_generation()
+    g.population_size = generation.population_size
+    g.species = generation.species
+    g.unspecified_genomes = generation.unspecified_genomes
+
+    return g
 end
 
 function new_inital_generation(population_size)
     local generation = new_generation(population_size)
 
     for i=1, population_size do
-        local genome = new_genome()
         table.insert(generation.species, new_species())
-        mutate(genome)
-        table.insert(generation.species[i].genomes, genome)
+        table.insert(generation.species[i].genomes, new_genome())
     end
 
+    table.insert(generations, generation)
     return generation
 end
 
-focus_generation = new_inital_generation(config.pop_size)
-print(focus_generation)
-focus_species = nil
-focus_genome = focus_generation.species[1].genomes[1]
+focus_generation_key = 1
+focus_species_key = 1
+focus_genome_key = 1
+
+new_inital_generation(config.pop_size)
+focus_generation = generations[focus_generation_key]
+focus_generation:mutate_genomes()
+focus_species = focus_generation.species[focus_species_key]
+focus_genome = focus_species.genomes[focus_genome_key]
+
+function do_this_when_dead()
+    focus_genome.calculated_fitness = focus_genome:get_fitness()
+    emu.poweron()
+    if focus_species_key == #focus_generation.species then
+        -- rewrite this entire mess,
+        -- when a new generation is being created, take the top 5 species and take their most successful genome and 
+        -- mutate them in relation to the adjusted fitness score sum in a seperate list. after that, delete all of
+        -- the old genomes except the top 5 species' genomes, since we already have the good genomes in a seperate 
+        -- list. 
+        focus_species_key = 1
+        focus_genome_key = 1
+        local old_pop = focus_generation:get_population_size()
+        
+        for k, v in pairs(focus_generation.species) do
+            v:sort_genomes()
+        end
+
+        local strong_genomes = {}
+        for k, v in pairs(focus_generation.species) do
+            for g=1, min(5, 1 + tonumber(#v.genomes / 2)) do
+                table.insert(strong_genomes, v.genomes[1])
+            end
+        end
+
+        local function compare(a,b)
+            return a.calculated_fitness > b.calculated_fitness
+        end
+
+        table.sort(strong_genomes, compare)
+        local new_species_list = {}
+
+
+
+        focus_generation_key = focus_generation_key + 1
+        focus_species_key = 1
+        focus_genome_key = 1
+        focus_generation:find_all_species()
+        focus_generation = copy_generation(focus_generation)
+    elseif focus_genome_key == #focus_species.genomes then
+        focus_species_key = focus_species_key + 1
+        focus_genome_key = 1
+    else
+        focus_genome_key = focus_genome_key + 1
+    end
+    focus_generation = generations[focus_generation_key]
+    focus_species = focus_generation.species[focus_species_key]
+    focus_genome = focus_species.genomes[focus_genome_key]
+end
+
+function test_next_gen()
+    -- force starts game
+    if memory.readbyte(0x0770) == 0 then -- weird solution, i know
+        joypad.set(1, {start = true})
+        emu.frameadvance()
+        joypad.set(1, {start = false})
+    end
+    
+    -- new gen
+    if is_dead() then
+        do_this_when_dead()
+    end
+end
+
+function draw_info(generation, species, genome, fitness)
+    gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16, "gen: "..generation, color1, color2)
+    gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16+8, "species: "..species, color1, color2)
+    gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16+8*2, "genome: "..genome, color1, color2)
+    gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16+8*3, "fitness: "..fitness, color1, color2)
+end
+
+is_timer_set = false
+start_timeout = 0
+
+function is_not_moving()
+    return 0 == memory.readbyte(0x0057)
+end
+
+function is_dead()
+    if memory.readbyte(0x000E) == 11 then -- 6 is dead, 11 is dying
+        return true
+    end
+    return false
+end
 
 while (true) do
+    if is_not_moving() and not is_timer_set and get_game_timer() ~= 0 then
+        is_timer_set = true
+        start_timeout = get_game_timer()
+    end
+    if not is_not_moving() then
+        is_timer_set = false
+    end
+
     get_positions()
     ai_inputs = get_map()
     read_enemies(ai_inputs)
@@ -464,6 +768,15 @@ while (true) do
     focus_genome:eval()
     draw_buttons()
     
+    test_next_gen()
+    draw_info(focus_generation_key, focus_species_key.."/"..#focus_generation.species, focus_genome_key.."/"..#focus_species.genomes, focus_genome:get_fitness())
+    -- gui.drawtext(0, 210, "gen: "..focus_generation_key.."  species: "..focus_species_key.."  genome: "..focus_genome_key.."  fitness: "..focus_genome:get_fitness(), color1, color2)
     gui.drawtext(0, 220, "developed by novial // andrew hong", color1, color2)
+
+    if get_game_timer() <= start_timeout - 8 and is_timer_set then
+        is_timer_set = false
+        do_this_when_dead()
+    end
+
     emu.frameadvance()
 end
