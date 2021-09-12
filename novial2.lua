@@ -33,15 +33,6 @@ function get_game_timer()
     return tonumber(memory.readbyte(0x07F8)..memory.readbyte(0x07F9)..memory.readbyte(0x07FA))
 end
 
-function has_value(tab, val)
-    for index, value in ipairs(tab) do
-        if value == val then
-            return true
-        end
-    end
-    return false
-end
-
 function get_positions()
     mario_x = memory.readbyte(0x0086) + memory.readbyte(0x006D) * 256
     mario_y = memory.readbyte(0x03B8)
@@ -478,9 +469,13 @@ end
 
 function copy_genome(genome)
     local g = new_genome()
-    g.hidden_nodes = genome.hidden_nodes
-    g.connections = genome.connections
-
+    for k, v in pairs(genome.hidden_nodes) do
+        table.insert(g.hidden_nodes, v)
+    end
+    for k, v in pairs(genome.connections) do
+        table.insert(g.connections, v)
+    end
+    
     return g
 end
 
@@ -557,9 +552,8 @@ end
 
 generations = {}
 
-function new_generation(population_size)
+function new_generation()
     local generation = {
-        population_size = population_size,
         species = {},
         unspecified_genomes = {}
     }
@@ -580,13 +574,13 @@ function new_generation(population_size)
         local function new_species_data(species_innov, species_dis)
             return {species_innov = species_innov, species_dis = species_dis}
         end
-
         local search_results = {}
         for k, v in pairs(generation.species) do
-            if v:species_eval(genome) < config.compatibility_threshold then
-                table.insert(search_results, new_species_data(k, v:species_eval(genome)))
+            local thres = v:species_eval(genome)
+            if thres < config.compatibility_threshold then
+                table.insert(search_results, new_species_data(k, thres))
             end
-        end        
+        end
         
         local function compare(a,b)
             return a.species_dis > b.species_dis
@@ -630,6 +624,14 @@ function new_generation(population_size)
         return sum
     end
 
+    function generation:sort_species()
+        local function compare(a,b)
+            return a.genomes[1].calculated_fitness > b.genomes[1].calculated_fitness
+        end
+
+        table.sort(generation.species, compare)
+    end
+
     table.insert(generations, generation)
     return generation
 end
@@ -644,7 +646,7 @@ function copy_generation(generation)
 end
 
 function new_inital_generation(population_size)
-    local generation = new_generation(population_size)
+    local generation = new_generation()
 
     for i=1, population_size do
         table.insert(generation.species, new_species())
@@ -662,6 +664,10 @@ focus_genome_key = 1
 new_inital_generation(config.pop_size)
 focus_generation = generations[focus_generation_key]
 focus_generation:mutate_genomes()
+
+--focus_generation.species[1].genomes[1].connections = {}
+--focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
+
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
 
@@ -680,29 +686,43 @@ function do_this_when_dead()
         
         for k, v in pairs(focus_generation.species) do
             v:sort_genomes()
+            v.genomes = {v.genomes[1]}
         end
 
-        local strong_genomes = {}
-        for k, v in pairs(focus_generation.species) do
-            for g=1, min(5, 1 + tonumber(#v.genomes / 2)) do
-                table.insert(strong_genomes, v.genomes[1])
-            end
+        focus_generation:sort_species()
+        local strong_species = {}
+
+        for g=1, math.min(3, tonumber(#focus_generation.species / 2)) do
+            table.insert(strong_species, focus_generation.species[g])
         end
 
         local function compare(a,b)
-            return a.calculated_fitness > b.calculated_fitness
+            return a.genomes[1].calculated_fitness > b.genomes[1].calculated_fitness
         end
 
-        table.sort(strong_genomes, compare)
-        local new_species_list = {}
+        table.sort(strong_species, compare)
+        local new_gen = new_generation()
 
-
-
+        for k, v in pairs(strong_species) do
+            local new_spec = new_species()
+            local new_genomes_num = 1 + v.get_fitness_sum() / old_pop * 10
+            table.insert(new_spec.genomes, v.genomes[1])
+            for i=1, new_genomes_num do
+                local g = copy_genome(v.genomes[1])
+                g:mutate()
+                table.insert(new_gen.unspecified_genomes, g)
+                print("new genome")
+            end
+            table.insert(new_gen.species, new_spec)
+        end
+    
+        new_gen:find_all_species()
+        
+        focus_generation = new_gen
         focus_generation_key = focus_generation_key + 1
         focus_species_key = 1
         focus_genome_key = 1
-        focus_generation:find_all_species()
-        focus_generation = copy_generation(focus_generation)
+        print(focus_generation)
     elseif focus_genome_key == #focus_species.genomes then
         focus_species_key = focus_species_key + 1
         focus_genome_key = 1
@@ -769,9 +789,9 @@ while (true) do
     draw_buttons()
     
     test_next_gen()
-    draw_info(focus_generation_key, focus_species_key.."/"..#focus_generation.species, focus_genome_key.."/"..#focus_species.genomes, focus_genome:get_fitness())
+    draw_info(focus_generation_key, focus_species_key, focus_genome_key, focus_genome:get_fitness())
     -- gui.drawtext(0, 210, "gen: "..focus_generation_key.."  species: "..focus_species_key.."  genome: "..focus_genome_key.."  fitness: "..focus_genome:get_fitness(), color1, color2)
-    gui.drawtext(0, 220, "developed by novial // andrew hong", color1, color2)
+    -- gui.drawtext(0, 220, "developed by novial // andrew hong", color1, color2)
 
     if get_game_timer() <= start_timeout - 8 and is_timer_set then
         is_timer_set = false
