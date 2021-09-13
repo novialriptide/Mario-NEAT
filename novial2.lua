@@ -358,11 +358,10 @@ function new_genome()
             -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
             if #genome:get_nodes() > 13*17+8 and 0.5 > math.random(0, 1) then
                 genome:add_connection(math.random(13*17+1, #genome:get_nodes()), math.random(13*17+8+1, #genome:get_nodes()))
-                has_mutate_happen = true
             else
                 genome:add_connection(math.random(1, #genome:get_nodes()), math.random(13*17+1, #genome:get_nodes()))
-                has_mutate_happen = true
             end
+            has_mutate_happen = true
         end
     
         for k, v in pairs(genome.connections) do
@@ -374,11 +373,10 @@ function new_genome()
             if config.enabled_default and config.enabled_mutate_rate > math.random() then
                 if 0.5 > math.random() then
                     v.enabled = true
-                    has_mutate_happen = true
                 else
                     v.enabled = false
-                    has_mutate_happen = true
                 end
+                has_mutate_happen = true
             end
         end
         if not has_mutate_happen then
@@ -459,8 +457,8 @@ function new_genome()
     end
 
     function genome:get_fitness()
-        local timer = get_game_timer() / 100
-        local score = timer + mario_x / 10
+        local timer = get_game_timer()
+        local score = timer + mario_x
         return score
     end
 
@@ -508,11 +506,9 @@ function new_species()
         local sum = 0
         for k, v in pairs(species.genomes) do
             if k ~= genome_key then
+                local spec_com = is_same_species(g, v)
                 local thres = 0
-                if math.abs(v.calculated_fitness - g.calculated_fitness) > config.fitness_threshold then
-                    thres = 0
-                end
-                if math.abs(v.calculated_fitness - g.calculated_fitness) < config.fitness_threshold then
+                if spec_com < config.compatibility_threshold then
                     thres = 1
                 end
                 sum = sum + thres
@@ -615,6 +611,26 @@ function new_generation()
         return pop
     end
 
+    function generation:get_genomes()
+        local pop = {}
+        for k1, v1 in pairs(generation.species) do
+            for k2, v2 in pairs(v1.genomes) do
+                table.insert(pop, v2)
+            end
+        end
+
+        return pop
+    end
+
+    function generation:get_fitness_sum()
+        local sum = 0
+        for k, v in pairs(generation.species) do
+            sum = sum + v:get_fitness_sum()
+        end
+
+        return sum
+    end
+
     function generation:get_adjusted_fitness_sum()
         local sum = 0
         for k, v in pairs(generation.species) do
@@ -657,6 +673,18 @@ function new_inital_generation(population_size)
     return generation
 end
 
+function get_adjusted_fitness(genomes, genome)
+    sum = 0
+    for k, v in pairs(genomes) do
+        local spec_com = is_same_species(genome, v)
+        local val = 0
+        if spec_com < config.compatibility_threshold then val = 1 end
+        sum = sum + val
+    end
+
+    return genome.calculated_fitness / sum
+end
+
 focus_generation_key = 1
 focus_species_key = 1
 focus_genome_key = 1
@@ -665,14 +693,18 @@ new_inital_generation(config.pop_size)
 focus_generation = generations[focus_generation_key]
 focus_generation:mutate_genomes()
 
---focus_generation.species[1].genomes[1].connections = {}
---focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
+-- focus_generation.species[1].genomes[1].connections = {}
+-- focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
 
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
 
 function do_this_when_dead()
     focus_genome.calculated_fitness = focus_genome:get_fitness()
+    if focus_genome.calculated_fitness >= config.fitness_threshold then
+        print(focus_genome)
+        return
+    end
     emu.poweron()
     if focus_species_key == #focus_generation.species then
         -- rewrite this entire mess,
@@ -686,13 +718,12 @@ function do_this_when_dead()
         
         for k, v in pairs(focus_generation.species) do
             v:sort_genomes()
-            v.genomes = {v.genomes[1]}
         end
 
         focus_generation:sort_species()
         local strong_species = {}
 
-        for g=1, math.min(3, tonumber(#focus_generation.species / 2)) do
+        for g=1, tonumber(#focus_generation.species / 2) do
             table.insert(strong_species, focus_generation.species[g])
         end
 
@@ -705,24 +736,24 @@ function do_this_when_dead()
 
         for k, v in pairs(strong_species) do
             local new_spec = new_species()
-            local new_genomes_num = 1 + v.get_fitness_sum() / old_pop * 10
-            table.insert(new_spec.genomes, v.genomes[1])
+            local new_genomes_num = get_adjusted_fitness(focus_generation:get_genomes(), v.genomes[1]) / #focus_generation:get_genomes()
+            print("creating "..new_genomes_num.." genomes for generation "..(focus_generation_key + 1).."..")
             for i=1, new_genomes_num do
                 local g = copy_genome(v.genomes[1])
                 g:mutate()
                 table.insert(new_gen.unspecified_genomes, g)
-                print("new genome")
             end
+            table.insert(new_spec.genomes, copy_genome(v.genomes[1]))
+            print("done!")
             table.insert(new_gen.species, new_spec)
         end
-    
+
         new_gen:find_all_species()
         
         focus_generation = new_gen
         focus_generation_key = focus_generation_key + 1
         focus_species_key = 1
         focus_genome_key = 1
-        print(focus_generation)
     elseif focus_genome_key == #focus_species.genomes then
         focus_species_key = focus_species_key + 1
         focus_genome_key = 1
@@ -732,6 +763,12 @@ function do_this_when_dead()
     focus_generation = generations[focus_generation_key]
     focus_species = focus_generation.species[focus_species_key]
     focus_genome = focus_species.genomes[focus_genome_key]
+    print("=== Summary =======================")
+    print("Generation          : "..focus_generation_key)
+    print("Species             : "..focus_species_key)
+    print("Genome              : "..focus_genome_key)
+    print("Total Pop           : "..focus_generation:get_population_size())
+    print("Total Species Pop   : "..#focus_species.genomes)
 end
 
 function test_next_gen()
