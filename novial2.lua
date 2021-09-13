@@ -3,6 +3,8 @@ config = require("config")
 math.randomseed(os.time())
 math.random(); math.random(); math.random()
 
+LOG_MUTATIONS = true
+
 box_size = 4
 
 x_offset = 20
@@ -306,6 +308,7 @@ function new_genome()
             for k, v in pairs(global_connections) do
                 if connect_node.node_in == v.node_in and connect_node.node_out == v.node_out then
                     for k, v in pairs(genome.connections) do
+                        -- test if the connection is already implemented
                         if v == connect_node then
                             return
                         end
@@ -334,7 +337,8 @@ function new_genome()
     function genome:mutate()
         local has_mutate_happen = false
         if config.node_delete_prob > math.random() then
-            if #genome.hidden_nodes ~= 0 or #genome.connections ~= 0 then
+            if #genome.hidden_nodes ~= 0 and #genome.connections ~= 0 then
+                if LOG_MUTATIONS then print("node deleted") end
                 genome:delete_node(math.random(1, #genome:get_nodes()))
                 has_mutate_happen = true
             end
@@ -342,19 +346,22 @@ function new_genome()
 
         if config.node_add_prob > math.random() then
             if #genome.connections ~= 0 then
+                if LOG_MUTATIONS then print("node added") end
                 genome:add_node()
                 has_mutate_happen = true
             end
         end
     
         if config.conn_delete_prob > math.random() and #genome.connections > 0 then
-            if #genome.hidden_nodes ~= 0 or #genome.connections ~= 0 then
+            if #genome.hidden_nodes ~= 0 and #genome.connections ~= 0 then
+                if LOG_MUTATIONS then print("connection deleted") end
                 genome:remove_connection(math.random(1, #genome.connections))
                 has_mutate_happen = true
             end
         end
     
         if config.conn_add_prob > math.random() then
+            if LOG_MUTATIONS then print("connection added") end
             -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
             if #genome:get_nodes() > 13*17+8 and 0.5 > math.random(0, 1) then
                 genome:add_connection(math.random(13*17+1, #genome:get_nodes()), math.random(13*17+8+1, #genome:get_nodes()))
@@ -367,16 +374,19 @@ function new_genome()
         for k, v in pairs(genome.connections) do
             if config.weight_mutate_rate > math.random() then
                 v.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
-                has_mutate_happen = true
+                if LOG_MUTATIONS then print("weight mutated ("..v.weight..")") end
+                -- has_mutate_happen = true
             end
             
             if config.enabled_default and config.enabled_mutate_rate > math.random() then
                 if 0.5 > math.random() then
+                    if LOG_MUTATIONS then print("connection enabled") end
                     v.enabled = true
                 else
+                    if LOG_MUTATIONS then print("connection disabled") end
                     v.enabled = false
                 end
-                has_mutate_happen = true
+                -- has_mutate_happen = true
             end
         end
         if not has_mutate_happen then
@@ -689,13 +699,14 @@ focus_species_key = 1
 focus_genome_key = 1
 highest_fitness_score = 0
 highest_fitness_genome = 0
+highest_fitness_score_generation = 0
 
 new_inital_generation(config.pop_size)
 focus_generation = generations[focus_generation_key]
 focus_generation:mutate_genomes()
 
--- focus_generation.species[1].genomes[1].connections = {}
--- focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
+-- focus_generation.species[5].genomes[1].connections = {}
+-- focus_generation.species[5].genomes[1]:add_connection(13*17, 13*17+3)
 
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
@@ -705,6 +716,9 @@ function do_this_when_dead()
     if focus_genome.calculated_fitness > highest_fitness_score then
         highest_fitness_score = focus_genome.calculated_fitness
         highest_fitness_genome = copy_genome(focus_genome)
+    end
+    if focus_genome.calculated_fitness > highest_fitness_score_generation then
+        highest_fitness_score_generation = focus_genome.calculated_fitness
     end
     if focus_genome.calculated_fitness >= config.fitness_threshold then
         print(focus_genome)
@@ -743,12 +757,12 @@ function do_this_when_dead()
             local new_spec = new_species()
             local new_genomes_num = get_adjusted_fitness(focus_generation:get_genomes(), v.genomes[1]) / #focus_generation:get_genomes()
             print("creating "..new_genomes_num.." genomes for generation "..(focus_generation_key + 1).."..")
+            table.insert(new_spec.genomes, copy_genome(v.genomes[1]))
             for i=1, new_genomes_num do
                 local g = copy_genome(v.genomes[1])
                 g:mutate()
                 table.insert(new_gen.unspecified_genomes, g)
             end
-            table.insert(new_spec.genomes, copy_genome(v.genomes[1]))
             print("done!")
             table.insert(new_gen.species, new_spec)
         end
@@ -759,6 +773,7 @@ function do_this_when_dead()
         focus_generation_key = focus_generation_key + 1
         focus_species_key = 1
         focus_genome_key = 1
+        highest_fitness_score_generation = 0
         print(highest_fitness_genome, highest_fitness_score)
     elseif focus_genome_key == #focus_species.genomes then
         focus_species_key = focus_species_key + 1
@@ -776,6 +791,7 @@ function do_this_when_dead()
     print("Total Pop           : "..focus_generation:get_population_size())
     print("Total Species Pop   : "..#focus_species.genomes)
     print("Highest Fitness     : "..highest_fitness_score)
+    print("Highest Fitness Gen : "..highest_fitness_score_generation)
 end
 
 function test_next_gen()
