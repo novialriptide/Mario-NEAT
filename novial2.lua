@@ -681,13 +681,14 @@ function get_adjusted_fitness(genomes, genome)
         if spec_com < config.compatibility_threshold then val = 1 end
         sum = sum + val
     end
-
     return genome.calculated_fitness / sum
 end
 
 focus_generation_key = 1
 focus_species_key = 1
 focus_genome_key = 1
+highest_fitness_score = 0
+highest_fitness_genome = 0
 
 new_inital_generation(config.pop_size)
 focus_generation = generations[focus_generation_key]
@@ -701,6 +702,10 @@ focus_genome = focus_species.genomes[focus_genome_key]
 
 function do_this_when_dead()
     focus_genome.calculated_fitness = focus_genome:get_fitness()
+    if focus_genome.calculated_fitness > highest_fitness_score then
+        highest_fitness_score = focus_genome.calculated_fitness
+        highest_fitness_genome = copy_genome(focus_genome)
+    end
     if focus_genome.calculated_fitness >= config.fitness_threshold then
         print(focus_genome)
         return
@@ -754,6 +759,7 @@ function do_this_when_dead()
         focus_generation_key = focus_generation_key + 1
         focus_species_key = 1
         focus_genome_key = 1
+        print(highest_fitness_genome, highest_fitness_score)
     elseif focus_genome_key == #focus_species.genomes then
         focus_species_key = focus_species_key + 1
         focus_genome_key = 1
@@ -769,6 +775,7 @@ function do_this_when_dead()
     print("Genome              : "..focus_genome_key)
     print("Total Pop           : "..focus_generation:get_population_size())
     print("Total Species Pop   : "..#focus_species.genomes)
+    print("Highest Fitness     : "..highest_fitness_score)
 end
 
 function test_next_gen()
