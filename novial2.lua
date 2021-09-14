@@ -748,18 +748,21 @@ function do_this_when_dead()
 
         print(#strong_species)
 
-        local function compare(a,b)
+        local function compare1(a,b)
             return a.genomes[1].calculated_fitness > b.genomes[1].calculated_fitness
         end
+        
+        local function compare2(a,b)
+            return a.genomes.calculated_fitness > b.genomes.calculated_fitness
+        end
 
-        table.sort(strong_species, compare)
+        table.sort(strong_species, compare1)
         local new_gen = new_generation()
 
         for k, v in pairs(strong_species) do
             local new_spec = new_species()
             local new_genomes_num = get_adjusted_fitness(focus_generation:get_genomes(), v.genomes[1]) / #focus_generation:get_genomes()
             print("creating "..new_genomes_num.." genomes for generation "..(focus_generation_key + 1).."..")
-            table.insert(new_spec.genomes, copy_genome(v.genomes[1]))
             for i=1, new_genomes_num do
                 local g = copy_genome(v.genomes[1])
                 g:mutate()
@@ -767,6 +770,13 @@ function do_this_when_dead()
             end
             print("done!")
             table.insert(new_gen.species, new_spec)
+        end
+        
+        local all_genomes = focus_generation:get_genomes()
+        table.sort(all_genomes, compare2)
+
+        for i=1, config.elitism do
+            table.insert(new_gen.unspecified_genomes, all_genomes[i])
         end
 
         new_gen:find_all_species()
