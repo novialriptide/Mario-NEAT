@@ -753,7 +753,7 @@ function do_this_when_dead()
         end
         
         local function compare2(a,b)
-            return a.genomes.calculated_fitness > b.genomes.calculated_fitness
+            return a.calculated_fitness > b.calculated_fitness
         end
 
         table.sort(strong_species, compare1)
