@@ -769,14 +769,8 @@ function do_this_when_dead()
                 table.insert(new_gen.unspecified_genomes, g)
             end
             print("done!")
+            table.insert(new_spec.genomes, copy(v.genomes[1]))
             table.insert(new_gen.species, new_spec)
-        end
-        
-        local all_genomes = focus_generation:get_genomes()
-        table.sort(all_genomes, compare2)
-
-        for i=1, config.elitism do
-            table.insert(new_gen.unspecified_genomes, all_genomes[i])
         end
 
         new_gen:find_all_species()
