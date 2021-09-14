@@ -742,7 +742,7 @@ function do_this_when_dead()
         focus_generation:sort_species()
         local strong_species = {}
 
-        for g=1, tonumber(#focus_generation.species * config.min_species_size) do
+        for g=1, tonumber(#focus_generation.species * config.survival_threshold + 1) do
             table.insert(strong_species, focus_generation.species[g])
         end
 
