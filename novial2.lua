@@ -705,8 +705,8 @@ new_inital_generation(config.pop_size)
 focus_generation = generations[focus_generation_key]
 focus_generation:mutate_genomes()
 
-focus_generation.species[1].genomes[1].connections = {}
-focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
+-- focus_generation.species[1].genomes[1].connections = {}
+-- focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
 
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
@@ -742,7 +742,7 @@ function do_this_when_dead()
         focus_generation:sort_species()
         local strong_species = {}
 
-        for g=1, tonumber(#focus_generation.species / 2) do
+        for g=1, tonumber(#focus_generation.species * config.min_species_size) do
             table.insert(strong_species, focus_generation.species[g])
         end
 
