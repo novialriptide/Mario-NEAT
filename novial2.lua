@@ -453,31 +453,6 @@ function new_species()
         return sum / #genomes
     end
 
-    function species:get_adjusted_fitness(genome_key)
-        local g = species.genomes[genome_key]
-        local sum = 0
-        for k, v in pairs(species.genomes) do
-            if k ~= genome_key then
-                local spec_com = is_same_species(g, v)
-                local thres = 0
-                if spec_com < config.compatibility_threshold then
-                    thres = 1
-                end
-                sum = sum + thres
-            end
-        end
-        return g.calculated_fitness / sum
-    end
-
-    function species:get_adjusted_fitness_sum()
-        local sum = 0
-        for k, v in pairs(species.genomes) do
-            sum = sum + species:get_adjusted_fitness(k)
-        end
-
-        return sum
-    end
-
     function species:get_fitness_sum()
         local sum = 0
         for k, v in pairs(species.genomes) do
@@ -578,15 +553,6 @@ function new_generation()
         local sum = 0
         for k, v in pairs(generation.species) do
             sum = sum + v:get_fitness_sum()
-        end
-
-        return sum
-    end
-
-    function generation:get_adjusted_fitness_sum()
-        local sum = 0
-        for k, v in pairs(generation.species) do
-            sum = sum + v:get_adjusted_fitness_sum()
         end
 
         return sum
@@ -720,14 +686,14 @@ function write_data(file_name, data)
             for k2, v2 in pairs(v1.genomes) do
                 compiled_data = compiled_data.."\n species: "..k1..", genome: "..k2.. ", fitness score: "..v2.calculated_fitness
                 for k3, v3 in pairs(v2.hidden_nodes) do
-                    compiled_data = compiled_data.."\n - [node] value: "..v3.value.." type: "..v3.type.." coords:("..v3.x..","..v3.y..")"
+                    compiled_data = compiled_data.."\n - [node] value: "..v3.value.." type: "..v3.type.." coords: ("..v3.x..","..v3.y..")"
                 end
 
                 for k3, v3 in pairs(v2.connections) do
                     local enabled_str = "true"
                     if v3.enabled then enabled_str = "true" end
                     if not v3.enabled then enabled_str = "false" end
-                    compiled_data = compiled_data.."\n - [conn] innov: "..v3.innov.." weight: "..v3.weight.." node_in: "..v3.node_in.." node_in: "..v3.node_in.." enabled: "..enabled_str
+                    compiled_data = compiled_data.."\n - [conn] innov: "..v3.innov.." weight: "..v3.weight.." node_in: "..v3.node_in.." node_out: "..v3.node_out.." enabled: "..enabled_str
                 end
             end
         end
