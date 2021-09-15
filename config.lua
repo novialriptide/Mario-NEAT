@@ -10,7 +10,7 @@
 config = {
     fitness_criterion     = max,
     fitness_threshold     = 3000, -- found solution
-    pop_size              = 5, -- 500,
+    pop_size              = 500, -- 500,
     reset_on_extinction   = 0,
 
     -- [DefaultGenome]
@@ -22,9 +22,9 @@ config = {
     compatibility_disjoint_coefficient = 1.0,
     compatibility_weight_coefficient   = 0.6,
     conn_add_prob           = 0.2,
-    conn_delete_prob        = 0.05,
+    conn_delete_prob        = 0.2,
     node_add_prob           = 0.2,
-    node_delete_prob        = 0.05,
+    node_delete_prob        = 0.2,
     -- activation_default      = my_sinc_function
     -- activation_options      = sigmoid my_sinc_function
     activation_mutate_rate  = 0.1,

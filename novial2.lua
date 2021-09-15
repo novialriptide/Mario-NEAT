@@ -25,7 +25,7 @@ mario_x_screen_scroll = 0
 
 moving_objects = {}
 
-inputs_keys = {"A", "B", "right", "left", "up", "down", "start", "select"}
+inputs_keys = {"A", "B", "right", "left", "up", "down"}
 
 function sigmoid(x)
     return 1 / (1 + math.pow(2.71828, -x))
@@ -334,66 +334,6 @@ function new_genome()
         end
     end
 
-    function genome:mutate()
-        local has_mutate_happen = false
-        if config.node_delete_prob > math.random() then
-            if #genome.hidden_nodes ~= 0 and #genome.connections ~= 0 then
-                if LOG_MUTATIONS then print("node deleted") end
-                genome:delete_node(math.random(1, #genome:get_nodes()))
-                has_mutate_happen = true
-            end
-        end
-
-        if config.node_add_prob > math.random() then
-            if #genome.connections ~= 0 then
-                if LOG_MUTATIONS then print("node added") end
-                genome:add_node()
-                has_mutate_happen = true
-            end
-        end
-    
-        if config.conn_delete_prob > math.random() and #genome.connections > 0 then
-            if #genome.hidden_nodes ~= 0 and #genome.connections ~= 0 then
-                if LOG_MUTATIONS then print("connection deleted") end
-                genome:remove_connection(math.random(1, #genome.connections))
-                has_mutate_happen = true
-            end
-        end
-    
-        if config.conn_add_prob > math.random() then
-            if LOG_MUTATIONS then print("connection added") end
-            -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
-            if #genome:get_nodes() > 13*17+8 and 0.5 > math.random(0, 1) then
-                genome:add_connection(math.random(13*17+1, #genome:get_nodes()), math.random(13*17+8+1, #genome:get_nodes()))
-            else
-                genome:add_connection(math.random(1, #genome:get_nodes()), math.random(13*17+1, #genome:get_nodes()))
-            end
-            has_mutate_happen = true
-        end
-    
-        for k, v in pairs(genome.connections) do
-            if config.weight_mutate_rate > math.random() then
-                v.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
-                if LOG_MUTATIONS then print("weight mutated ("..v.weight..")") end
-                -- has_mutate_happen = true
-            end
-            
-            if config.enabled_default and config.enabled_mutate_rate > math.random() then
-                if 0.5 > math.random() then
-                    if LOG_MUTATIONS then print("connection enabled") end
-                    v.enabled = true
-                else
-                    if LOG_MUTATIONS then print("connection disabled") end
-                    v.enabled = false
-                end
-                -- has_mutate_happen = true
-            end
-        end
-        if not has_mutate_happen then
-            genome:mutate()
-        end
-    end
-
     function genome:get_in_nodes(innov)
         -- gets all of the nodes that connect to the specific node's input
         local results = {}
@@ -434,14 +374,11 @@ function new_genome()
         end
         
         local inputs = {}
-        local inputs_keys = {"A", "B", "right", "left", "up", "down", "start", "select"}
         for k, v in pairs(output_nodes) do
             if v.value > 0.9 then
                 inputs[inputs_keys[k]] = true
             end
         end
-        inputs["start"] = nil
-        inputs["select"] = nil
         joypad.set(1, inputs)
 
         return inputs
@@ -478,10 +415,15 @@ end
 function copy_genome(genome)
     local g = new_genome()
     for k, v in pairs(genome.hidden_nodes) do
-        table.insert(g.hidden_nodes, v)
+        local n = new_node(v.value, v.type, v.innov)
+        n.x = v.x
+        n.y = v.y
+        table.insert(g.hidden_nodes, n)
     end
     for k, v in pairs(genome.connections) do
-        table.insert(g.connections, v)
+        local c = new_connection(v.node_in, v.node_out, v.weight)
+        c.innov = v.innov
+        table.insert(g.connections, c)
     end
     
     return g
@@ -494,7 +436,7 @@ function new_species()
 
     function species:mutate_genomes()
         for k, v in pairs(species.genomes) do
-            v:mutate()
+            mutate(v)
         end
     end
 
@@ -683,6 +625,66 @@ function new_inital_generation(population_size)
     return generation
 end
 
+function mutate(genome)
+    local has_mutate_happen = false
+    if config.node_delete_prob > math.random() then
+        if #genome.hidden_nodes ~= 0 and #genome.connections ~= 0 then
+            if LOG_MUTATIONS then print("node deleted") end
+            genome:delete_node(math.random(1, #genome:get_nodes()))
+            has_mutate_happen = true
+        end
+    end
+
+    if config.node_add_prob > math.random() then
+        if #genome.connections ~= 0 then
+            if LOG_MUTATIONS then print("node added") end
+            genome:add_node()
+            has_mutate_happen = true
+        end
+    end
+
+    if config.conn_delete_prob > math.random() and #genome.connections > 0 then
+        if #genome.hidden_nodes ~= 0 and #genome.connections ~= 0 then
+            if LOG_MUTATIONS then print("connection deleted") end
+            genome:remove_connection(math.random(1, #genome.connections))
+            has_mutate_happen = true
+        end
+    end
+
+    if config.conn_add_prob > math.random() then
+        if LOG_MUTATIONS then print("connection added") end
+        -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
+        if #genome:get_nodes() > 13*17+6 and 0.5 > math.random(0, 1) then
+            genome:add_connection(math.random(13*17+1, #genome:get_nodes()), math.random(13*17+6+1, #genome:get_nodes()))
+        else
+            genome:add_connection(math.random(1, #genome:get_nodes()), math.random(13*17+1, #genome:get_nodes()))
+        end
+        has_mutate_happen = true
+    end
+
+    for k, v in pairs(genome.connections) do
+        if config.weight_mutate_rate > math.random() then
+            v.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
+            if LOG_MUTATIONS then print("weight mutated ("..v.weight..")") end
+            -- has_mutate_happen = true
+        end
+        
+        if config.enabled_default and config.enabled_mutate_rate > math.random() then
+            if 0.5 > math.random() then
+                if LOG_MUTATIONS then print("connection enabled") end
+                v.enabled = true
+            else
+                if LOG_MUTATIONS then print("connection disabled") end
+                v.enabled = false
+            end
+            -- has_mutate_happen = true
+        end
+    end
+    if not has_mutate_happen then
+        mutate(genome)
+    end
+end
+
 function get_adjusted_fitness(genomes, genome)
     sum = 0
     for k, v in pairs(genomes) do
@@ -711,6 +713,32 @@ focus_generation:mutate_genomes()
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
 
+function write_data(file_name, data)
+    local function compile_data(data)
+        local compiled_data = ""
+        for k1, v1 in pairs(data.species) do
+            for k2, v2 in pairs(v1.genomes) do
+                compiled_data = compiled_data.."\n species: "..k1..", genome: "..k2.. ", fitness score: "..v2.calculated_fitness
+                for k3, v3 in pairs(v2.hidden_nodes) do
+                    compiled_data = compiled_data.."\n - [node] value: "..v3.value.." type: "..v3.type.." coords:("..v3.x..","..v3.y..")"
+                end
+
+                for k3, v3 in pairs(v2.connections) do
+                    local enabled_str = "true"
+                    if v3.enabled then enabled_str = "true" end
+                    if not v3.enabled then enabled_str = "false" end
+                    compiled_data = compiled_data.."\n - [conn] innov: "..v3.innov.." weight: "..v3.weight.." node_in: "..v3.node_in.." node_in: "..v3.node_in.." enabled: "..enabled_str
+                end
+            end
+        end
+
+        return compiled_data
+    end
+    file = io.open("saves/"..file_name..".txt", "w")
+    file:write(compile_data(data))
+    file:close()
+end
+
 function do_this_when_dead()
     focus_genome.calculated_fitness = focus_genome:get_fitness()
     if focus_genome.calculated_fitness > highest_fitness_score then
@@ -726,11 +754,7 @@ function do_this_when_dead()
     end
     emu.poweron()
     if focus_species_key == #focus_generation.species then
-        -- rewrite this entire mess,
-        -- when a new generation is being created, take the top 5 species and take their most successful genome and 
-        -- mutate them in relation to the adjusted fitness score sum in a seperate list. after that, delete all of
-        -- the old genomes except the top 5 species' genomes, since we already have the good genomes in a seperate 
-        -- list. 
+        write_data("gen"..focus_generation_key, focus_generation)
         focus_species_key = 1
         focus_genome_key = 1
         local old_pop = focus_generation:get_population_size()
@@ -763,13 +787,13 @@ function do_this_when_dead()
             local new_spec = new_species()
             local new_genomes_num = get_adjusted_fitness(focus_generation:get_genomes(), v.genomes[1]) / #focus_generation:get_genomes()
             print("creating "..new_genomes_num.." genomes for generation "..(focus_generation_key + 1).."..")
+            table.insert(new_spec.genomes, copy_genome(v.genomes[1]))
             for i=1, new_genomes_num do
                 local g = copy_genome(v.genomes[1])
-                g:mutate()
+                mutate(g)
                 table.insert(new_gen.unspecified_genomes, g)
             end
             print("done!")
-            table.insert(new_spec.genomes, copy(v.genomes[1]))
             table.insert(new_gen.species, new_spec)
         end
 
@@ -790,10 +814,7 @@ function do_this_when_dead()
     focus_generation = generations[focus_generation_key]
     focus_species = focus_generation.species[focus_species_key]
     focus_genome = focus_species.genomes[focus_genome_key]
-    print("=== Summary =======================")
-    print("Generation          : "..focus_generation_key)
-    print("Species             : "..focus_species_key)
-    print("Genome              : "..focus_genome_key)
+    print("")
     print("Total Pop           : "..focus_generation:get_population_size())
     print("Total Species Pop   : "..#focus_species.genomes)
     print("Highest Fitness     : "..highest_fitness_score)
