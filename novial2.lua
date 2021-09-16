@@ -686,14 +686,14 @@ function write_data(file_name, data)
             for k2, v2 in pairs(v1.genomes) do
                 compiled_data = compiled_data.."\n species: "..k1..", genome: "..k2.. ", fitness score: "..v2.calculated_fitness
                 for k3, v3 in pairs(v2.hidden_nodes) do
-                    compiled_data = compiled_data.."\n - [node] value: "..v3.value.." type: "..v3.type.." coords: ("..v3.x..","..v3.y..")"
+                    compiled_data = compiled_data.."\n - [node] value: "..v3.value..", type: "..v3.type..", coords: ("..v3.x..","..v3.y..")"
                 end
 
                 for k3, v3 in pairs(v2.connections) do
                     local enabled_str = "true"
                     if v3.enabled then enabled_str = "true" end
                     if not v3.enabled then enabled_str = "false" end
-                    compiled_data = compiled_data.."\n - [conn] innov: "..v3.innov.." weight: "..v3.weight.." node_in: "..v3.node_in.." node_out: "..v3.node_out.." enabled: "..enabled_str
+                    compiled_data = compiled_data.."\n - [conn] innov: "..v3.innov..", weight: "..v3.weight..", node_in: "..v3.node_in..", node_out: "..v3.node_out..", enabled: "..enabled_str
                 end
             end
         end
@@ -715,7 +715,8 @@ function do_this_when_dead()
         highest_fitness_score_generation = focus_genome.calculated_fitness
     end
     if focus_genome.calculated_fitness >= config.fitness_threshold then
-        -- print(focus_genome)
+        write_data("gen"..focus_generation_key, focus_generation)
+        print("Threshold reached!!")
         return
     end
     emu.poweron()
@@ -735,8 +736,6 @@ function do_this_when_dead()
         for g=1, tonumber(#focus_generation.species * config.survival_threshold + 1) do
             table.insert(strong_species, focus_generation.species[g])
         end
-
-        print(#strong_species)
 
         local function compare1(a,b)
             return a.genomes[1].calculated_fitness > b.genomes[1].calculated_fitness
@@ -770,7 +769,6 @@ function do_this_when_dead()
         focus_species_key = 1
         focus_genome_key = 1
         highest_fitness_score_generation = 0
-        -- print(highest_fitness_genome, highest_fitness_score)
     elseif focus_genome_key == #focus_species.genomes then
         focus_species_key = focus_species_key + 1
         focus_genome_key = 1
@@ -783,7 +781,7 @@ function do_this_when_dead()
     print("")
     print("Total Pop           : "..focus_generation:get_population_size())
     print("Total Species Pop   : "..#focus_species.genomes)
-    print("Highest Fitness     : "..highest_fitness_score)
+    print("Highest Fitness Net : "..highest_fitness_score)
     print("Highest Fitness Gen : "..highest_fitness_score_generation)
 end
 
@@ -816,7 +814,7 @@ function is_not_moving()
 end
 
 function is_dead()
-    if memory.readbyte(0x000E) == 11 then -- 6 is dead, 11 is dying
+    if memory.readbyte(0x000E) == 0x0B or memory.readbyte(0x000E) == 0x06 then -- 6 is dead, 11 is dying
         return true
     end
     return false
@@ -841,7 +839,6 @@ while (true) do
     focus_genome:eval()
     draw_buttons()
     
-    test_next_gen()
     draw_info(focus_generation_key, focus_species_key, focus_genome_key, focus_genome:get_fitness())
     -- gui.drawtext(0, 210, "gen: "..focus_generation_key.."  species: "..focus_species_key.."  genome: "..focus_genome_key.."  fitness: "..focus_genome:get_fitness(), color1, color2)
     -- gui.drawtext(0, 220, "developed by novial // andrew hong", color1, color2)
@@ -850,6 +847,7 @@ while (true) do
         is_timer_set = false
         do_this_when_dead()
     end
+    test_next_gen()
 
     emu.frameadvance()
 end
