@@ -570,7 +570,7 @@ end
 function mutate(genome)
     local has_mutate_happen = false
     if config.node_delete_prob > math.random() then
-        if #genome.hidden_nodes ~= 0 and #genome.connections ~= 0 then
+        if #genome.hidden_nodes > 1 and #genome.connections > 0 then
             if LOG_MUTATIONS then print("node deleted") end
             genome:delete_node(math.random(1, #genome:get_nodes()))
             has_mutate_happen = true
@@ -586,7 +586,7 @@ function mutate(genome)
     end
 
     if config.conn_delete_prob > math.random() and #genome.connections > 0 then
-        if #genome.hidden_nodes ~= 0 and #genome.connections ~= 0 then
+        if #genome.hidden_nodes > 0 and #genome.connections > 1 then
             if LOG_MUTATIONS then print("connection deleted") end
             genome:remove_connection(math.random(1, #genome.connections))
             has_mutate_happen = true
@@ -683,7 +683,7 @@ function write_data(file_name, data)
 end
 
 function do_this_when_dead()
-    local survival_num = #focus_generation.species * survival_threshold + 1
+    local survival_num = #focus_generation.species * config.survival_threshold + 1
     focus_genome.calculated_fitness = focus_genome:get_fitness()
     if focus_genome.calculated_fitness > highest_fitness_score then
         highest_fitness_score = focus_genome.calculated_fitness
