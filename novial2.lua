@@ -1,7 +1,7 @@
 config = require("config")
 
 math.randomseed(os.time())
-math.random(); math.random(); math.random()
+math.random(); math.random(); math.random() -- agony agony agony agony agony agony agony
 
 LOG_MUTATIONS = false
 
@@ -147,10 +147,6 @@ function map_to_list(level_data)
     return map_list
 end
 
-function element_to_screen(element)
-    return {x = (element-1) % 17 + 1, y = math.floor((element-1) / 17) + 1}
-end
-
 function cell_to_screen(x, y)
     return {x = x_offset+(x-2)*box_size + box_size/2, y = y_offset+(y-0)*box_size + box_size/2}
     -- return {x = x_offset - box_size/2 + box_size*(x-1), y = y_offset - box_size/2 + box_size*(y-1)}
@@ -212,14 +208,7 @@ function is_same_species(genome1, genome2)
 end
 
 function new_node(value, type, innov)
-    local node = {
-        innov = innov,
-        value = value, 
-        type = type,
-        x = 0,
-        y = 0
-    }
-
+    local node = {innov = innov, value = value, type = type, x = 0, y = 0}
     local coords = {}
     if type == "HIDDEN" then
         coords = random_screen_coords()
@@ -235,24 +224,11 @@ function new_node(value, type, innov)
 end
 
 function new_connection(node1, node2, weight)
-    local connection = {
-        weight = weight, 
-        node_in = node1, 
-        node_out = node2, 
-        innov = 0, 
-        enabled = true
-    }
-    
-    return connection
+    return {weight = weight, node_in = node1, node_out = node2, innov = 0, enabled = true}
 end
 
 function new_genome()
-    local genome = {
-        hidden_nodes = {},
-        connections = {},
-        is_alive = true,
-        calculated_fitness = 0
-    }
+    local genome = {hidden_nodes = {}, connections = {}, is_alive = true, calculated_fitness = 0}
     
     function genome:get_nodes()
         local nodes = {}
@@ -724,15 +700,12 @@ function do_this_when_dead()
         write_data("gen"..focus_generation_key, focus_generation)
         focus_species_key = 1
         focus_genome_key = 1
-        local old_pop = focus_generation:get_population_size()
-        
         for k, v in pairs(focus_generation.species) do
             v:sort_genomes()
         end
 
         focus_generation:sort_species()
         local strong_species = {}
-
         for g=1, tonumber(#focus_generation.species * config.survival_threshold + 1) do
             table.insert(strong_species, focus_generation.species[g])
         end
@@ -747,7 +720,6 @@ function do_this_when_dead()
 
         table.sort(strong_species, compare1)
         local new_gen = new_generation()
-
         for k, v in pairs(strong_species) do
             local new_spec = new_species()
             local new_genomes_num = get_adjusted_fitness(focus_generation:get_genomes(), v.genomes[1]) / #focus_generation:get_genomes()
@@ -763,7 +735,6 @@ function do_this_when_dead()
         end
 
         new_gen:find_all_species()
-        
         focus_generation = new_gen
         focus_generation_key = focus_generation_key + 1
         focus_species_key = 1
@@ -786,8 +757,7 @@ function do_this_when_dead()
 end
 
 function test_next_gen()
-    -- force starts game
-    if memory.readbyte(0x0770) == 0 then -- weird solution, i know
+    if memory.readbyte(0x0770) == 0 then
         joypad.set(1, {start = true})
         emu.frameadvance()
         joypad.set(1, {start = false})
@@ -840,8 +810,6 @@ while (true) do
     draw_buttons()
     
     draw_info(focus_generation_key, focus_species_key, focus_genome_key, focus_genome:get_fitness())
-    -- gui.drawtext(0, 210, "gen: "..focus_generation_key.."  species: "..focus_species_key.."  genome: "..focus_genome_key.."  fitness: "..focus_genome:get_fitness(), color1, color2)
-    -- gui.drawtext(0, 220, "developed by novial // andrew hong", color1, color2)
 
     if get_game_timer() <= start_timeout - 8 and is_timer_set then
         is_timer_set = false
