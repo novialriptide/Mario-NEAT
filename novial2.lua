@@ -638,6 +638,7 @@ function get_adjusted_fitness(genomes, genome)
     return genome.calculated_fitness / sum
 end
 
+num_no_changes = 0
 focus_generation_key = 1
 focus_species_key = 1
 focus_genome_key = 1
@@ -682,6 +683,7 @@ function write_data(file_name, data)
 end
 
 function do_this_when_dead()
+    local survival_num = #focus_generation.species * survival_threshold + 1
     focus_genome.calculated_fitness = focus_genome:get_fitness()
     if focus_genome.calculated_fitness > highest_fitness_score then
         highest_fitness_score = focus_genome.calculated_fitness
@@ -697,6 +699,14 @@ function do_this_when_dead()
     end
     emu.poweron()
     if focus_species_key == #focus_generation.species then
+        if highest_fitness_score > highest_fitness_score_generation then
+            num_no_changes = num_no_changes + 1
+        end
+        
+        if num_no_changes > 10 then
+            survival_num = 2
+        end
+
         write_data("gen"..focus_generation_key, focus_generation)
         focus_species_key = 1
         focus_genome_key = 1
@@ -706,7 +716,7 @@ function do_this_when_dead()
 
         focus_generation:sort_species()
         local strong_species = {}
-        for g=1, tonumber(#focus_generation.species * config.survival_threshold + 1) do
+        for g=1, tonumber(survival_num) do
             table.insert(strong_species, focus_generation.species[g])
         end
 
