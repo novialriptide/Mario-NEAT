@@ -1,3 +1,6 @@
+-- This was programmed by Novial // Andrew
+-- Paper used: http://nn.cs.utexas.edu/downloads/papers/stanley.ec02.pdf
+
 config = require("config")
 
 math.randomseed(os.time())
@@ -149,7 +152,6 @@ end
 
 function cell_to_screen(x, y)
     return {x = x_offset+(x-2)*box_size + box_size/2, y = y_offset+(y-0)*box_size + box_size/2}
-    -- return {x = x_offset - box_size/2 + box_size*(x-1), y = y_offset - box_size/2 + box_size*(y-1)}
 end
 
 function random_screen_coords()
@@ -780,10 +782,10 @@ function test_next_gen()
 end
 
 function draw_info(generation, species, genome, fitness)
-    gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16, "gen: "..generation, color1, color2)
-    gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16+8, "species: "..species, color1, color2)
-    gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16+8*2, "genome: "..genome, color1, color2)
-    gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16+8*3, "fitness: "..fitness, color1, color2)
+    local text = {"gen: "..generation, "species: "..species, "genome: "..genome, "fitness: "..fitness}
+    for i=0, 3 do
+        gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16+8*i, text[i+1], color1, color2)
+    end
 end
 
 is_timer_set = false
@@ -794,10 +796,7 @@ function is_not_moving()
 end
 
 function is_dead()
-    if memory.readbyte(0x000E) == 0x0B or memory.readbyte(0x000E) == 0x06 then -- 6 is dead, 11 is dying
-        return true
-    end
-    return false
+    return memory.readbyte(0x000E) == 0x0B or memory.readbyte(0x000E) == 0x06 -- 6 is dead, 11 is dying
 end
 
 while (true) do
