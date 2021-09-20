@@ -826,10 +826,8 @@ function do_this_when_dead()
             for i=1, new_genomes_num do
                 local g = 0
                 if math.random() > 0.5 then
-                    print("copied")
                     g = copy_genome(v.genomes[1])
                 else
-                    print("crossovered")
                     g = crossover(v.genomes[math.random(1, #v.genomes)], v.genomes[math.random(1, #v.genomes)])
                 end
 
