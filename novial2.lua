@@ -727,8 +727,6 @@ new_inital_generation(config.pop_size)
 focus_generation = generations[focus_generation_key]
 focus_generation:mutate_genomes()
 
-print("Super Mario Bros AI\nProgrammed by Novial (@novialriptide, u/novialriptide)")
-
 -- focus_generation.species[1].genomes[1].connections = {}
 -- focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
 
