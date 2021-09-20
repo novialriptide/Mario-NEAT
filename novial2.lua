@@ -818,7 +818,7 @@ function do_this_when_dead()
             print("creating "..new_genomes_num.." genomes for generation "..(focus_generation_key + 1).."..")
             table.insert(new_spec.genomes, copy_genome(v.genomes[1]))
             for i=1, new_genomes_num do
-                local g = 0
+                local g = {}
                 if math.random() > 0.5 then
                     g = copy_genome(v.genomes[1])
                 else
