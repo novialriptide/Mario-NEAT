@@ -603,6 +603,16 @@ function get_excess_disjoint_genes(genome1, genome2)
     return diff_genes
 end
 
+function get_connection_innovs(connections)
+    local innovs = {}
+
+    for k, v in pairs(connections) do
+        table.insert(innovs, v.innov)
+    end
+
+    return innovs
+end
+
 function mutate(genome)
     local has_mutate_happen = false
     if config.node_delete_prob > math.random() then
@@ -664,38 +674,26 @@ function mutate(genome)
 end
 
 function crossover(genome1, genome2)
-    local dis_ex_genes = {}
-    local genome = 0
-    if genome1.calculated_fitness >= genome2.calculated_fitness then
-        dis_ex_genes = get_excess_disjoint_genes(genome1, genome2)
-        genome = copy_genome(genome1)
-    end
-    
+    local genome = copy_genome(genome1)
     if genome1.calculated_fitness < genome2.calculated_fitness then
-        dis_ex_genes = get_excess_disjoint_genes(genome2, genome1)
         genome = copy_genome(genome2)
     end
 
-    local genes = {}
-    for k1, v1 in pairs(genome1.connections) do
-        for k2, v2 in pairs(genome2.connections) do
-            if v1.innov == v2.innov then
-                table.insert(genes, {copy_connection(v1), copy_connection(v2)})
+    local same_genes = get_connection_innovs(get_same_genes(genome1, genome2))
+
+    for k1, v1 in pairs(same_genes) do
+        local sample_genome = {}
+        if math.random() > 0.5 then
+            sample_genome = genome1
+        else
+            sample_genome = genome2
+        end
+        for k2, v2 in pairs(sample_genome.connections) do
+            if v2.innov == v1 then
+                genome.connections[k2] = v2
             end
         end
     end
-
-    local new_connections = {}
-    for k, v in pairs(genes) do
-        if math.random() >= 0.5 then table.insert(new_connections, v[1]) end
-        if math.random() < 0.5 then table.insert(new_connections, v[2]) end
-    end
-
-    local genome_connections = {}
-    local n = 0
-    for k,v in ipairs(new_connections) do n=n+1; genome_connections[n] = v end
-    for k,v in ipairs(dis_ex_genes) do n=n+1; genome_connections[n] = v end
-    genome.connections = genome_connections
 
     return genome
 end
@@ -732,8 +730,8 @@ new_inital_generation(config.pop_size)
 focus_generation = generations[focus_generation_key]
 focus_generation:mutate_genomes()
 
--- focus_generation.species[1].genomes[1].connections = {}
--- focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
+focus_generation.species[1].genomes[1].connections = {}
+focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
 
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
