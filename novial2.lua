@@ -25,9 +25,7 @@ mario_map_x = 0
 mario_map_y = 0
 
 mario_x_screen_scroll = 0
-
 moving_objects = {}
-
 inputs_keys = {"A", "B", "right", "left", "up", "down"}
 
 function sigmoid(x)
@@ -329,8 +327,8 @@ function new_genome()
 
     function genome:eval()
         local nodes = genome:get_nodes()
-
         local available_nodes = {}
+
         for k, v in pairs(nodes) do
             if v.type ~= "INPUT" then
                 local in_nodes = genome:get_in_nodes(v.innov)
@@ -484,10 +482,6 @@ function new_generation()
     end
 
     function generation:_find_species(genome)
-        -- in this function, make it so that it checks the species compatibility 
-        -- with others and finds the which is the closest to the threshold value 
-        -- in the config.lua file. if it has found two same closest distances,
-        -- then it will choose a random species to be assigned
         local function new_species_data(species_innov, species_dis)
             return {species_innov = species_innov, species_dis = species_dis}
         end
@@ -697,13 +691,8 @@ function crossover(genome1, genome2)
 
     local new_connections = {}
     for k, v in pairs(genes) do
-        if math.random() > 0.5 then
-            table.insert(new_connections, v[1])
-        end
-        
-        if math.random() < 0.5 then
-            table.insert(new_connections, v[2])
-        end
+        if math.random() >= 0.5 then table.insert(new_connections, v[1]) end
+        if math.random() < 0.5 then table.insert(new_connections, v[2]) end
     end
 
     local genome_connections = {}
@@ -737,6 +726,8 @@ highest_fitness_score_generation = 0
 new_inital_generation(config.pop_size)
 focus_generation = generations[focus_generation_key]
 focus_generation:mutate_genomes()
+
+print("Super Mario Bros AI\nProgrammed by Novial (@novialriptide, u/novialriptide)")
 
 -- focus_generation.species[1].genomes[1].connections = {}
 -- focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
@@ -855,6 +846,7 @@ function do_this_when_dead()
     focus_genome = focus_species.genomes[focus_genome_key]
     print("")
     print("Total Pop           : "..focus_generation:get_population_size())
+    print("Total Species       : "..#focus_generation.species)
     print("Total Species Pop   : "..#focus_species.genomes)
     print("Highest Fitness Net : "..highest_fitness_score)
     print("Highest Fitness Gen : "..highest_fitness_score_generation)
