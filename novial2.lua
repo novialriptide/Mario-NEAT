@@ -162,8 +162,7 @@ function get_button_coords(button_number)
     return {x = 210, y = y_offset + (button_number-1)*10}
 end
 
-
-function is_same_species(genome1, genome2)
+function get_diff_genes(genome1, genome2)
     local diff_genes = {}
     local function check(t1, t2)
         local function has_value(table, value)
@@ -182,6 +181,13 @@ function is_same_species(genome1, genome2)
         end
     end
 
+    check(genome1, genome2)
+    check(genome2, genome1)
+
+    return diff_genes
+end
+
+function is_same_species(genome1, genome2)
     local function get_average_weight(genome)
         local average = 0
         for k, v in pairs(genome.connections) do 
@@ -193,10 +199,8 @@ function is_same_species(genome1, genome2)
             return average / #genome.connections
         end
     end
-
-    check(genome1, genome2)
-    check(genome2, genome1)
     
+    local diff_genes = get_diff_genes(genome1, genome2)
     local N = #genome1.connections
     if #genome1.connections < #genome2.connections then
         N = #genome2.connections
@@ -390,17 +394,29 @@ function new_genome()
     return genome
 end
 
+function copy_node(node)
+    local n = new_node(node.value, node.type, node.innov)
+    n.x = node.x
+    n.y = node.y
+
+    return n
+end
+
+function copy_connection(connection)
+    local c = new_connection(connection.node_in, connection.node_out, connection.weight)
+    c.innov = connection.innov
+
+    return c
+end
+
 function copy_genome(genome)
     local g = new_genome()
     for k, v in pairs(genome.hidden_nodes) do
-        local n = new_node(v.value, v.type, v.innov)
-        n.x = v.x
-        n.y = v.y
+        local n = copy_node(v)
         table.insert(g.hidden_nodes, n)
     end
     for k, v in pairs(genome.connections) do
-        local c = new_connection(v.node_in, v.node_out, v.weight)
-        c.innov = v.innov
+        local c = copy_connection(v)
         table.insert(g.connections, c)
     end
     
@@ -569,6 +585,34 @@ function new_inital_generation(population_size)
     return generation
 end
 
+function get_same_genes(genome1, genome2)
+    local same_genes = {}
+    for k1, v1 in pairs(genome1.connections) do
+        for k2, v2 in pairs(genome2.connections) do
+            if v2.innov == v1.innov then
+                table.insert(same_genes, copy_connection(v1))
+            end
+        end
+    end
+
+    return same_genes
+end
+
+function get_excess_disjoint_genes(genome1, genome2)
+    -- returns genome1 excess and disjoint genes
+    local same_genes = get_same_genes(genome1, genome2)
+    local diff_genes = {}
+    for k1, v1 in pairs(genome1.connections) do
+        for k2, v2 in pairs(same_genes) do
+            if v1.innov ~= v2.innov then
+                table.insert(diff_genes, copy_connection(v1))
+            end
+        end
+    end
+
+    return diff_genes
+end
+
 function mutate(genome)
     local has_mutate_happen = false
     if config.node_delete_prob > math.random() then
@@ -629,6 +673,48 @@ function mutate(genome)
     end
 end
 
+function crossover(genome1, genome2)
+    local dis_ex_genes = {}
+    local genome = 0
+    if genome1.calculated_fitness >= genome2.calculated_fitness then
+        dis_ex_genes = get_excess_disjoint_genes(genome1, genome2)
+        genome = copy_genome(genome1)
+    end
+    
+    if genome1.calculated_fitness < genome2.calculated_fitness then
+        dis_ex_genes = get_excess_disjoint_genes(genome2, genome1)
+        genome = copy_genome(genome2)
+    end
+
+    local genes = {}
+    for k1, v1 in pairs(genome1.connections) do
+        for k2, v2 in pairs(genome2.connections) do
+            if v1.innov == v2.innov then
+                table.insert(genes, {copy_connection(v1), copy_connection(v2)})
+            end
+        end
+    end
+
+    local new_connections = {}
+    for k, v in pairs(genes) do
+        if math.random() > 0.5 then
+            table.insert(new_connections, v[1])
+        end
+        
+        if math.random() < 0.5 then
+            table.insert(new_connections, v[2])
+        end
+    end
+
+    local genome_connections = {}
+    local n = 0
+    for k,v in ipairs(new_connections) do n=n+1; genome_connections[n] = v end
+    for k,v in ipairs(dis_ex_genes) do n=n+1; genome_connections[n] = v end
+    genome.connections = genome_connections
+
+    return genome
+end
+
 function get_adjusted_fitness(genomes, genome)
     sum = 0
     for k, v in pairs(genomes) do
@@ -652,8 +738,8 @@ new_inital_generation(config.pop_size)
 focus_generation = generations[focus_generation_key]
 focus_generation:mutate_genomes()
 
--- focus_generation.species[1].genomes[1].connections = {}
--- focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
+focus_generation.species[1].genomes[1].connections = {}
+focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
 
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
@@ -738,7 +824,15 @@ function do_this_when_dead()
             print("creating "..new_genomes_num.." genomes for generation "..(focus_generation_key + 1).."..")
             table.insert(new_spec.genomes, copy_genome(v.genomes[1]))
             for i=1, new_genomes_num do
-                local g = copy_genome(v.genomes[1])
+                local g = 0
+                if math.random() > 0.5 then
+                    print("copied")
+                    g = copy_genome(v.genomes[1])
+                else
+                    print("crossovered")
+                    g = crossover(v.genomes[math.random(1, #v.genomes)], v.genomes[math.random(1, #v.genomes)])
+                end
+
                 mutate(g)
                 table.insert(new_gen.unspecified_genomes, g)
             end
