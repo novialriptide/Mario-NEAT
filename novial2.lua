@@ -7,9 +7,7 @@ math.randomseed(os.time())
 math.random(); math.random(); math.random() -- agony agony agony agony agony agony agony
 
 LOG_MUTATIONS = false
-
 box_size = 4
-
 x_offset = 20
 y_offset = 40
 
@@ -49,9 +47,7 @@ function get_tile(_x, _y)
     local sub_y = math.floor((_y - 32) / 16)
     local addr = 0x0500 + page*208 + sub_y*16 + sub_x
     local byte = memory.readbyte(addr)
-    if byte ~= 0 and byte ~= 194 then
-        return 1
-    end
+    if byte ~= 0 and byte ~= 194 then return 1 end
     return 0
 end
 
@@ -715,6 +711,15 @@ function get_adjusted_fitness(genomes, genome)
     return genome.calculated_fitness / sum
 end
 
+function get_adjusted_fitness_sum(gen_genomes, species_genomes)
+    sum = 0
+    for k, v in pairs(species_genomes) do
+        sum = sum + get_adjusted_fitness(gen_genomes, v)
+    end
+
+    return sum
+end
+
 num_no_changes = 0
 focus_generation_key = 1
 focus_species_key = 1
@@ -809,7 +814,7 @@ function do_this_when_dead()
         local new_gen = new_generation()
         for k, v in pairs(strong_species) do
             local new_spec = new_species()
-            local new_genomes_num = get_adjusted_fitness(focus_generation:get_genomes(), v.genomes[1]) / #focus_generation:get_genomes()
+            local new_genomes_num = get_adjusted_fitness_sum(focus_generation:get_genomes(), v.genomes) / #focus_generation:get_genomes()
             print("creating "..new_genomes_num.." genomes for generation "..(focus_generation_key + 1).."..")
             table.insert(new_spec.genomes, copy_genome(v.genomes[1]))
             for i=1, new_genomes_num do
