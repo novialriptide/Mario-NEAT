@@ -683,10 +683,10 @@ function crossover(genome1, genome2)
 
     for k1, v1 in pairs(same_genes) do
         local sample_genome = {}
-        if math.random() > 0.5 then
-            sample_genome = genome1
-        else
-            sample_genome = genome2
+        if math.random() > 0.5 then 
+            sample_genome = copy_genome(genome1)
+        else 
+            sample_genome = copy_genome(genome2)
         end
         for k2, v2 in pairs(sample_genome.connections) do
             if v2.innov == v1 then
