@@ -15,6 +15,7 @@ color1 = 0xFF0000FF
 color2 = 0x400000FF
 color3 = 0xDD0000FF
 color4 = 0xAA0000FF
+color5 = {r = 22, g = 99, b = 32}
 
 mario_x = 0
 mario_y = 0
@@ -265,16 +266,15 @@ function new_genome()
         return genome:get_node(innov) ~= nil
     end
 
-    function genome:add_node()
-        table.insert(genome.hidden_nodes, new_node(0, "HIDDEN"))
-    end
+    function genome:split_connection(connection, node_innov)
+        local c1 = copy_connection(connection)
+        local c2 = copy_connection(connection)
+        c1.node_out = node_innov
+        c1.innov = 0
+        c2.node_in = node_innov
+        c2.innov = 0
 
-    function genome:delete_node(innov)
-        for k, v in pairs(genome.hidden_nodes) do
-            if innov == v.innov then
-                table.remove(genome.hidden_nodes, k)
-            end
-        end
+        return {c1, c2}
     end
 
     function genome:add_connection(node1, node2)
@@ -306,6 +306,27 @@ function new_genome()
         for k, v in pairs(genome.connections) do
             if innov == v.innov then
                 table.remove(genome.connections, k)
+            end
+        end
+    end
+
+    function genome:add_node()
+        table.insert(genome.hidden_nodes, new_node(0, "HIDDEN"))
+        local rand_conn_key = math.random(1, #genome.connections)
+        local rand_conn = genome.connections[rand_conn_key]
+        local node_innov = #inputs_keys + config.num_inputs + #genome.hidden_nodes
+        local new_connections = genome:split_connection(rand_conn, node_innov)
+        genome.connections[rand_conn_key] = nil
+        for k, v in pairs(new_connections) do
+            genome:add_connection(v.node_in, v.node_out)
+        end
+        print(genome.connections)
+    end
+
+    function genome:delete_node(innov)
+        for k, v in pairs(genome.hidden_nodes) do
+            if innov == v.innov then
+                table.remove(genome.hidden_nodes, k)
             end
         end
     end
@@ -365,9 +386,17 @@ function new_genome()
             if genome:does_node_exist(v.node_in) and genome:does_node_exist(v.node_out) and v.enabled then
                 local node_in = genome:get_node(v.node_in)
                 local node_out = genome:get_node(v.node_out)
+                local converted_coords = {}
+                local color = color3
+                if v.weight >= 0 then color = color5 end 
+                
                 if node_in.type == "INPUT" then
-                    local converted_coords = cell_to_screen(node_in.x, node_in.y)
-                    gui.drawline(converted_coords.x, converted_coords.y, node_out.x+box_size/2, node_out.y+box_size/2, color3)
+                    converted_coords = cell_to_screen(node_in.x, node_in.y)
+                    gui.drawline(converted_coords.x, converted_coords.y, node_out.x+box_size/2, node_out.y+box_size/2, color)
+                end
+                if node_in.type == "HIDDEN" then
+                    converted_coords = {x = node_in.x, y = node_in.y}
+                    gui.drawline(converted_coords.x, converted_coords.y, node_out.x+box_size/2, node_out.y+box_size/2, color)
                 end
             end
         end
@@ -730,8 +759,8 @@ new_inital_generation(config.pop_size)
 focus_generation = generations[focus_generation_key]
 focus_generation:mutate_genomes()
 
--- focus_generation.species[1].genomes[1].connections = {}
--- focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
+focus_generation.species[1].genomes[1].connections = {}
+focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
 
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
