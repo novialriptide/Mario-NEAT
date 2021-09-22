@@ -320,7 +320,6 @@ function new_genome()
         for k, v in pairs(new_connections) do
             genome:add_connection(v.node_in, v.node_out)
         end
-        print(genome.connections)
     end
 
     function genome:delete_node(innov)
@@ -579,7 +578,6 @@ function new_generation()
         table.sort(generation.species, compare)
     end
 
-    table.insert(generations, generation)
     return generation
 end
 
@@ -759,8 +757,8 @@ new_inital_generation(config.pop_size)
 focus_generation = generations[focus_generation_key]
 focus_generation:mutate_genomes()
 
--- focus_generation.species[1].genomes[1].connections = {}
--- focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
+focus_generation.species[1].genomes[1].connections = {}
+focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
 
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
@@ -845,6 +843,9 @@ function do_this_when_dead()
             print("creating "..new_genomes_num.." genomes for generation "..(focus_generation_key + 1).."..")
             table.insert(new_spec.genomes, copy_genome(v.genomes[1]))
             for i=1, new_genomes_num do
+                -- add a check here which when it copies a genome it compares it with all for
+                -- the already created genomes to see if the genome was already created, thus
+                -- elimating copies that would give the same result
                 local g = {}
                 if math.random() > 0.5 then
                     g = copy_genome(v.genomes[1])
@@ -860,11 +861,11 @@ function do_this_when_dead()
         end
 
         new_gen:find_all_species()
-        focus_generation = new_gen
         focus_generation_key = focus_generation_key + 1
         focus_species_key = 1
         focus_genome_key = 1
         highest_fitness_score_generation = 0
+        table.insert(generations, new_gen)
     elseif focus_genome_key == #focus_species.genomes then
         focus_species_key = focus_species_key + 1
         focus_genome_key = 1
