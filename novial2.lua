@@ -229,7 +229,7 @@ function new_connection(node1, node2, weight)
 end
 
 function new_genome()
-    local genome = {hidden_nodes = {}, connections = {}, is_alive = true, calculated_fitness = 0}
+    local genome = {hidden_nodes = {}, connections = {}, is_alive = true, calculated_fitness = 0, is_carried_over = false}
     
     function genome:get_nodes()
         local nodes = {}
@@ -358,8 +358,11 @@ function new_genome()
                         sum = sum + val * v.weight
                     end
                 end
+
                 v.value = sigmoid(sum)
             end
+
+            if v.type == "HIDDEN" then print(v.value) end
         end
 
         local output_nodes = {}
@@ -479,6 +482,12 @@ function new_species()
     end
 
     function species:sort_genomes()
+        for k, v in pairs(species.genomes) do
+            if v.is_carried_over then
+                table.insert(v, 1, table.remove(v, k))
+            end
+        end
+        
         local function compare(a,b)
             return a.calculated_fitness > b.calculated_fitness
         end
@@ -841,7 +850,14 @@ function do_this_when_dead()
             local new_spec = new_species()
             local new_genomes_num = get_adjusted_fitness_sum(focus_generation:get_genomes(), v.genomes) / #focus_generation:get_genomes()
             print("creating "..new_genomes_num.." genomes for generation "..(focus_generation_key + 1).."..")
-            table.insert(new_spec.genomes, copy_genome(v.genomes[1]))
+            if v.genomes[1].is_carried_over then
+                print("carrying over a genome from previous gen")
+            else
+                print("no genome to carry over from previous gen")
+            end
+            local prev_g = copy_genome(v.genomes[1])
+            prev_g.is_carried_over = true
+            table.insert(new_spec.genomes, prev_g)
             for i=1, new_genomes_num do
                 -- add a check here which when it copies a genome it compares it with all for
                 -- the already created genomes to see if the genome was already created, thus
