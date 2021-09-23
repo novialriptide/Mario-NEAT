@@ -708,28 +708,24 @@ function mutate(genome)
 end
 
 function crossover(genome1, genome2)
-    local genome = copy_genome(genome1)
+    local primary_genome = copy_genome(genome1)
+    local secondary_genome = copy_genome(genome2)
     if genome1.calculated_fitness < genome2.calculated_fitness then
-        genome = copy_genome(genome2)
+        primary_genome = copy_genome(genome2)
+        secondary_genome = copy_genome(genome1)
     end
 
-    local same_genes = get_connection_innovs(get_same_genes(genome1, genome2))
-
-    for k1, v1 in pairs(same_genes) do
-        local sample_genome = {}
-        if math.random() > 0.5 then 
-            sample_genome = copy_genome(genome1)
-        else 
-            sample_genome = copy_genome(genome2)
-        end
-        for k2, v2 in pairs(sample_genome.connections) do
-            if v2.innov == v1 then
-                genome.connections[k2] = v2
+    for k1, v1 in pairs(primary_genome.connections) do
+        for k2, v2 in pairs(secondary_genome.connections) do
+            if v1.innov == v2.innov then
+                if math.random() >= 0.5 then
+                    primary_genome.connections[k1] = v2 
+                end
             end
         end
     end
 
-    return genome
+    return primary_genome
 end
 
 function get_adjusted_fitness(genomes, genome)
