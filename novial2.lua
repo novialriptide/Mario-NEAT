@@ -361,8 +361,6 @@ function new_genome()
 
                 v.value = sigmoid(sum)
             end
-
-            if v.type == "HIDDEN" then print(v.value) end
         end
 
         local output_nodes = {}
