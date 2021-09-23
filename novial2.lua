@@ -799,7 +799,7 @@ function write_data(file_name, data)
 end
 
 function do_this_when_dead()
-    local survival_num = #focus_generation.species * config.survival_threshold + 1
+    local survival_num = #focus_generation.species * config.survival_threshold
     focus_genome.calculated_fitness = focus_genome:get_fitness()
     if focus_genome.calculated_fitness > highest_fitness_score then
         highest_fitness_score = focus_genome.calculated_fitness
@@ -820,7 +820,9 @@ function do_this_when_dead()
         end
         
         if num_no_changes > 10 then
+            print("!! WARNING: fitness score is not making improvements. Breeding only 2 species")
             survival_num = 2
+            num_no_changes = 0
         end
 
         write_data("gen"..focus_generation_key, focus_generation)

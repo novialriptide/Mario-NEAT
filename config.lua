@@ -10,7 +10,7 @@
 config = {
     fitness_criterion     = max,
     fitness_threshold     = 3000, -- found solution
-    pop_size              = 400, -- 400,
+    pop_size              = 300, -- 300,
     reset_on_extinction   = 0,
 
     -- [DefaultGenome]
