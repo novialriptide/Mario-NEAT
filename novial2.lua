@@ -793,7 +793,7 @@ function write_data(file_name, data)
 end
 
 function do_this_when_dead()
-    local survival_num = #focus_generation.species * config.survival_threshold
+    local survival_num = #focus_generation.species * config.survival_threshold + 1
     focus_genome.calculated_fitness = focus_genome:get_fitness()
     if focus_genome.calculated_fitness > highest_fitness_score then
         highest_fitness_score = focus_genome.calculated_fitness
@@ -828,6 +828,7 @@ function do_this_when_dead()
 
         focus_generation:sort_species()
         local strong_species = {}
+        print(survival_num)
         for g=1, tonumber(survival_num) do
             table.insert(strong_species, focus_generation.species[g])
         end
@@ -845,7 +846,7 @@ function do_this_when_dead()
         for k, v in pairs(strong_species) do
             local new_spec = new_species()
             local new_genomes_num = get_adjusted_fitness_sum(focus_generation:get_genomes(), v.genomes) / #focus_generation:get_genomes()
-            print("creating "..new_genomes_num.." genomes for generation "..(focus_generation_key + 1).."..")
+            print("creating "..new_genomes_num.." genome(s) for generation "..(focus_generation_key + 1).."..")
             if v.genomes[1].is_carried_over then
                 print("carrying over a genome from previous gen")
             else
@@ -865,6 +866,7 @@ function do_this_when_dead()
                     g = crossover(v.genomes[math.random(1, #v.genomes)], v.genomes[math.random(1, #v.genomes)])
                 end
 
+                print(g)
                 mutate(g)
                 table.insert(new_gen.unspecified_genomes, g)
             end
@@ -884,6 +886,10 @@ function do_this_when_dead()
     else
         focus_genome_key = focus_genome_key + 1
     end
+    if focus_generation:get_population_size() == 0 then
+        print("ERROR: extinction")
+    end
+
     focus_generation = generations[focus_generation_key]
     focus_species = focus_generation.species[focus_species_key]
     focus_genome = focus_species.genomes[focus_genome_key]
