@@ -676,10 +676,10 @@ function mutate(genome)
     if config.conn_add_prob > math.random() then
         if LOG_MUTATIONS then print("connection added") end
         -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
-        if #genome:get_nodes() > 13*17+6 and 0.5 > math.random(0, 1) then
-            genome:add_connection(math.random(13*17+1, #genome:get_nodes()), math.random(13*17+6+1, #genome:get_nodes()))
+        if #genome:get_nodes() > config.num_inputs+6 and 0.5 > math.random(0, 1) then
+            genome:add_connection(math.random(config.num_inputs+1, #genome:get_nodes()), math.random(config.num_inputs+6+1, #genome:get_nodes()))
         else
-            genome:add_connection(math.random(1, #genome:get_nodes()), math.random(13*17+1, #genome:get_nodes()))
+            genome:add_connection(math.random(1, #genome:get_nodes()), math.random(config.num_inputs+1, #genome:get_nodes()))
         end
         has_mutate_happen = true
     end
@@ -761,7 +761,7 @@ focus_generation = generations[focus_generation_key]
 focus_generation:mutate_genomes()
 
 -- focus_generation.species[1].genomes[1].connections = {}
--- focus_generation.species[1].genomes[1]:add_connection(13*17, 13*17+3)
+-- focus_generation.species[1].genomes[1]:add_connection(config.num_inputs, config.num_inputs+3)
 
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
