@@ -493,8 +493,6 @@ function new_species()
     return species
 end
 
-generations = {}
-
 function new_generation()
     local generation = {
         species = {},
