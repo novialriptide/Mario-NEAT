@@ -351,11 +351,8 @@ function new_genome()
                 local sum = 0
                 for k, v in pairs(in_nodes) do
                     if genome:does_node_exist(v.innov) then
-                        local val = nil
                         local g = genome:get_node(v.innov)
-                        val = g.value
-
-                        sum = sum + val * v.weight
+                        sum = sum + g.value * v.weight
                     end
                 end
 
@@ -736,6 +733,7 @@ function get_adjusted_fitness(genomes, genome)
         if spec_com < config.compatibility_threshold then val = 1 end
         sum = sum + val
     end
+    
     return genome.calculated_fitness / sum
 end
 
@@ -747,24 +745,6 @@ function get_adjusted_fitness_sum(gen_genomes, species_genomes)
 
     return sum
 end
-
-num_no_changes = 0
-focus_generation_key = 1
-focus_species_key = 1
-focus_genome_key = 1
-highest_fitness_score = 0
-highest_fitness_genome = 0
-highest_fitness_score_generation = 0
-
-new_inital_generation(config.pop_size)
-focus_generation = generations[focus_generation_key]
-focus_generation:mutate_genomes()
-
--- focus_generation.species[1].genomes[1].connections = {}
--- focus_generation.species[1].genomes[1]:add_connection(config.num_inputs, config.num_inputs+3)
-
-focus_species = focus_generation.species[focus_species_key]
-focus_genome = focus_species.genomes[focus_genome_key]
 
 function write_data(file_name, data)
     local function compile_data(data)
@@ -792,137 +772,12 @@ function write_data(file_name, data)
     file:close()
 end
 
-function do_this_when_dead()
-    local survival_num = #focus_generation.species * config.survival_threshold + 1
-    focus_genome.calculated_fitness = focus_genome:get_fitness()
-    if focus_genome.calculated_fitness > highest_fitness_score then
-        highest_fitness_score = focus_genome.calculated_fitness
-        highest_fitness_genome = copy_genome(focus_genome)
-    end
-    if focus_genome.calculated_fitness > highest_fitness_score_generation then
-        highest_fitness_score_generation = focus_genome.calculated_fitness
-    end
-    if focus_genome.calculated_fitness >= config.fitness_threshold then
-        write_data("gen"..focus_generation_key, focus_generation)
-        print("Threshold reached!!")
-        return
-    end
-    emu.poweron()
-    if focus_species_key == #focus_generation.species then
-        if highest_fitness_score > highest_fitness_score_generation then
-            num_no_changes = num_no_changes + 1
-        end
-        
-        if num_no_changes > 10 then
-            print("!! WARNING: fitness score is not making improvements. Breeding only 2 species")
-            survival_num = 2
-            num_no_changes = 0
-        end
-
-        write_data("gen"..focus_generation_key, focus_generation)
-        focus_species_key = 1
-        focus_genome_key = 1
-        for k, v in pairs(focus_generation.species) do
-            v:sort_genomes()
-        end
-
-        focus_generation:sort_species()
-        local strong_species = {}
-        print(survival_num)
-        for g=1, tonumber(survival_num) do
-            table.insert(strong_species, focus_generation.species[g])
-        end
-
-        local function compare1(a,b)
-            return a.genomes[1].calculated_fitness > b.genomes[1].calculated_fitness
-        end
-        
-        local function compare2(a,b)
-            return a.calculated_fitness > b.calculated_fitness
-        end
-
-        table.sort(strong_species, compare1)
-        local new_gen = new_generation()
-        for k, v in pairs(strong_species) do
-            local new_spec = new_species()
-            local new_genomes_num = get_adjusted_fitness_sum(focus_generation:get_genomes(), v.genomes) / #focus_generation:get_genomes()
-            print("creating "..new_genomes_num.." genome(s) for generation "..(focus_generation_key + 1).."..")
-            if v.genomes[1].is_carried_over then
-                print("carrying over a genome from previous gen")
-            else
-                print("no genome to carry over from previous gen")
-            end
-            local prev_g = copy_genome(v.genomes[1])
-            prev_g.is_carried_over = true
-            table.insert(new_spec.genomes, prev_g)
-            for i=1, new_genomes_num do
-                -- add a check here which when it copies a genome it compares it with all for
-                -- the already created genomes to see if the genome was already created, thus
-                -- elimating copies that would give the same result
-                local g = {}
-                if math.random() > 0.5 then
-                    g = copy_genome(v.genomes[1])
-                else
-                    g = crossover(v.genomes[math.random(1, #v.genomes)], v.genomes[math.random(1, #v.genomes)])
-                end
-
-                print(g)
-                mutate(g)
-                table.insert(new_gen.unspecified_genomes, g)
-            end
-            print("done!")
-            table.insert(new_gen.species, new_spec)
-        end
-
-        new_gen:find_all_species()
-        focus_generation_key = focus_generation_key + 1
-        focus_species_key = 1
-        focus_genome_key = 1
-        highest_fitness_score_generation = 0
-        table.insert(generations, new_gen)
-    elseif focus_genome_key == #focus_species.genomes then
-        focus_species_key = focus_species_key + 1
-        focus_genome_key = 1
-    else
-        focus_genome_key = focus_genome_key + 1
-    end
-    if focus_generation:get_population_size() == 0 then
-        print("ERROR: extinction")
-    end
-
-    focus_generation = generations[focus_generation_key]
-    focus_species = focus_generation.species[focus_species_key]
-    focus_genome = focus_species.genomes[focus_genome_key]
-    print("")
-    print("Total Pop           : "..focus_generation:get_population_size())
-    print("Total Species       : "..#focus_generation.species)
-    print("Total Species Pop   : "..#focus_species.genomes)
-    print("Highest Fitness Net : "..highest_fitness_score)
-    print("Highest Fitness Gen : "..highest_fitness_score_generation)
-end
-
-function test_next_gen()
-    if memory.readbyte(0x0770) == 0 then
-        joypad.set(1, {start = true})
-        emu.frameadvance()
-        joypad.set(1, {start = false})
-    end
-    
-    -- new gen
-    if is_dead() then
-        do_this_when_dead()
-    end
-end
-
 function draw_info(generation, species, genome, fitness)
     local text = {"gen: "..generation, "species: "..species, "genome: "..genome, "fitness: "..fitness}
     for i=0, 3 do
         gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16+8*i, text[i+1], color1, color2)
     end
 end
-
-is_timer_set = false
-start_timeout = 0
 
 function is_not_moving()
     return 0 == memory.readbyte(0x0057)
@@ -932,34 +787,185 @@ function is_dead()
     return memory.readbyte(0x000E) == 0x0B or memory.readbyte(0x000E) == 0x06 -- 6 is dead, 11 is dying
 end
 
-emu.poweron()
+function start()
+    generations = {}
+    num_no_changes = 0
+    focus_generation_key = 1
+    focus_species_key = 1
+    focus_genome_key = 1
+    highest_fitness_score = 0
+    highest_fitness_genome = 0
+    highest_fitness_score_generation = 0
 
-while (true) do
-    if is_not_moving() and not is_timer_set and get_game_timer() ~= 0 then
-        is_timer_set = true
-        start_timeout = get_game_timer()
+    new_inital_generation(config.pop_size)
+    focus_generation = generations[focus_generation_key]
+    focus_generation:mutate_genomes()
+
+    -- focus_generation.species[1].genomes[1].connections = {}
+    -- focus_generation.species[1].genomes[1]:add_connection(config.num_inputs, config.num_inputs+3)
+
+    focus_species = focus_generation.species[focus_species_key]
+    focus_genome = focus_species.genomes[focus_genome_key]
+
+    local function do_this_when_dead()
+        local survival_num = #focus_generation.species * config.survival_threshold
+        focus_genome.calculated_fitness = focus_genome:get_fitness()
+        if focus_genome.calculated_fitness > highest_fitness_score then
+            highest_fitness_score = focus_genome.calculated_fitness
+            highest_fitness_genome = copy_genome(focus_genome)
+        end
+        if focus_genome.calculated_fitness > highest_fitness_score_generation then
+            highest_fitness_score_generation = focus_genome.calculated_fitness
+        end
+        if focus_genome.calculated_fitness >= config.fitness_threshold then
+            write_data("gen"..focus_generation_key, focus_generation)
+            print("Threshold reached!!")
+            return
+        end
+        emu.poweron()
+        if focus_species_key == #focus_generation.species then
+            if highest_fitness_score > highest_fitness_score_generation then
+                num_no_changes = num_no_changes + 1
+            end
+            
+            if num_no_changes > 10 then
+                print("!! WARNING: fitness score is not making improvements. Breeding only 2 species")
+                survival_num = 2
+                num_no_changes = 0
+            end
+
+            write_data("gen"..focus_generation_key, focus_generation)
+            focus_species_key = 1
+            focus_genome_key = 1
+            for k, v in pairs(focus_generation.species) do
+                v:sort_genomes()
+            end
+
+            focus_generation:sort_species()
+            local strong_species = {}
+            for g=1, tonumber(survival_num) do
+                table.insert(strong_species, focus_generation.species[g])
+            end
+
+            local function compare1(a,b)
+                return a.genomes[1].calculated_fitness > b.genomes[1].calculated_fitness
+            end
+            
+            local function compare2(a,b)
+                return a.calculated_fitness > b.calculated_fitness
+            end
+
+            table.sort(strong_species, compare1)
+            local new_gen = new_generation()
+            for k, v in pairs(strong_species) do
+                local new_spec = new_species()
+                local new_genomes_num = get_adjusted_fitness_sum(focus_generation:get_genomes(), v.genomes) / #focus_generation:get_genomes()
+                print("creating "..tonumber(new_genomes_num).." genome(s) for generation "..(focus_generation_key + 1).."..")
+                if v.genomes[1].is_carried_over then
+                    print("carrying over a genome from previous gen")
+                else
+                    print("no genome to carry over from previous gen")
+                end
+                local prev_g = copy_genome(v.genomes[1])
+                prev_g.is_carried_over = true
+                table.insert(new_spec.genomes, prev_g)
+
+                num_crossovers = 0
+                
+                for i=1, new_genomes_num do
+                    -- add a check here which when it copies a genome it compares it with all for
+                    -- the already created genomes to see if the genome was already created, thus
+                    -- elimating copies that would give the same result
+                    local g = {}
+                    if math.random() > 0.5 then
+                        g = copy_genome(v.genomes[1])
+                    elseif #v.genomes >= 2 then
+                        num_crossovers = num_crossovers + 1
+                        g = crossover(v.genomes[math.random(1, #v.genomes)], v.genomes[math.random(1, #v.genomes)])
+                    end
+                    mutate(g)
+                    table.insert(new_gen.unspecified_genomes, g)
+                end
+                print("done! ["..num_crossovers.." total crossovers]")
+                table.insert(new_gen.species, new_spec)
+            end
+
+            new_gen:find_all_species()
+            focus_generation_key = focus_generation_key + 1
+            focus_species_key = 1
+            focus_genome_key = 1
+            highest_fitness_score_generation = 0
+            table.insert(generations, new_gen)
+        elseif focus_genome_key == #focus_species.genomes then
+            focus_species_key = focus_species_key + 1
+            focus_genome_key = 1
+        else
+            focus_genome_key = focus_genome_key + 1
+        end
+
+        if #focus_generation:get_genomes() == 0 then
+            print("ERROR: extinction")
+            start()
+        end
+
+        focus_generation = generations[focus_generation_key]
+        focus_species = focus_generation.species[focus_species_key]
+        focus_genome = focus_species.genomes[focus_genome_key]
+        print("")
+        print("Total Pop           : "..focus_generation:get_population_size())
+        print("Total Species       : "..#focus_generation.species)
+        print("Total Species Pop   : "..#focus_species.genomes)
+        print("Highest Fitness Net : "..highest_fitness_score)
+        print("Highest Fitness Gen : "..highest_fitness_score_generation)
     end
-    if not is_not_moving() then
-        is_timer_set = false
+
+    local function test_next_gen()
+        if memory.readbyte(0x0770) == 0 then
+            joypad.set(1, {start = true})
+            emu.frameadvance()
+            joypad.set(1, {start = false})
+        end
+        
+        -- new gen
+        if is_dead() then
+            do_this_when_dead()
+        end
     end
 
-    get_positions()
-    ai_inputs = get_map()
-    read_enemies(ai_inputs)
-    draw_map(ai_inputs)
+    is_timer_set = false
+    start_timeout = 0
 
-    focus_genome:draw_connections()
-    focus_genome:draw_nodes()
-    focus_genome:eval()
-    draw_buttons()
-    
-    draw_info(focus_generation_key, focus_species_key, focus_genome_key, focus_genome:get_fitness())
+    emu.poweron()
 
-    if get_game_timer() <= start_timeout - 8 and is_timer_set then
-        is_timer_set = false
-        do_this_when_dead()
+    while (true) do
+        if is_not_moving() and not is_timer_set and get_game_timer() ~= 0 then
+            is_timer_set = true
+            start_timeout = get_game_timer()
+        end
+        if not is_not_moving() then
+            is_timer_set = false
+        end
+
+        get_positions()
+        ai_inputs = get_map()
+        read_enemies(ai_inputs)
+        draw_map(ai_inputs)
+
+        focus_genome:draw_connections()
+        focus_genome:draw_nodes()
+        focus_genome:eval()
+        draw_buttons()
+        
+        draw_info(focus_generation_key, focus_species_key, focus_genome_key, focus_genome:get_fitness())
+
+        if get_game_timer() <= start_timeout - 8 and is_timer_set then
+            is_timer_set = false
+            do_this_when_dead()
+        end
+        test_next_gen()
+
+        emu.frameadvance()
     end
-    test_next_gen()
-
-    emu.frameadvance()
 end
+
+start()
