@@ -1,3 +1,4 @@
+   
 -- This was programmed by Novial // Andrew
 -- Paper used: http://nn.cs.utexas.edu/downloads/papers/stanley.ec02.pdf
 
@@ -493,6 +494,8 @@ function new_species()
     return species
 end
 
+generations = {}
+
 function new_generation()
     local generation = {
         species = {},
@@ -731,7 +734,6 @@ function get_adjusted_fitness(genomes, genome)
         if spec_com < config.compatibility_threshold then val = 1 end
         sum = sum + val
     end
-    
     return genome.calculated_fitness / sum
 end
 
@@ -790,7 +792,7 @@ function write_data(file_name, data)
 end
 
 function do_this_when_dead()
-    local survival_num = #focus_generation.species * config.survival_threshold
+    local survival_num = #focus_generation.species * config.survival_threshold + 1
     focus_genome.calculated_fitness = focus_genome:get_fitness()
     if focus_genome.calculated_fitness > highest_fitness_score then
         highest_fitness_score = focus_genome.calculated_fitness
