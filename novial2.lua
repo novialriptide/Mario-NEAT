@@ -829,7 +829,7 @@ function do_this_when_dead()
 
         focus_generation:sort_species()
         local strong_species = {}
-        print(survival_num)
+        
         for g=1, tonumber(survival_num) do
             table.insert(strong_species, focus_generation.species[g])
         end
@@ -867,7 +867,6 @@ function do_this_when_dead()
                     g = crossover(v.genomes[math.random(1, #v.genomes)], v.genomes[math.random(1, #v.genomes)])
                 end
 
-                print(g)
                 mutate(g)
                 table.insert(new_gen.unspecified_genomes, g)
             end
