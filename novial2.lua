@@ -352,8 +352,11 @@ function new_genome()
                 local sum = 0
                 for k, v in pairs(in_nodes) do
                     if genome:does_node_exist(v.innov) then
+                        local val = nil
                         local g = genome:get_node(v.innov)
-                        sum = sum + g.value * v.weight
+                        val = g.value
+
+                        sum = sum + val * v.weight
                     end
                 end
 
@@ -760,7 +763,6 @@ focus_generation:mutate_genomes()
 
 -- focus_generation.species[1].genomes[1].connections = {}
 -- focus_generation.species[1].genomes[1]:add_connection(config.num_inputs, config.num_inputs+3)
--- focus_generation.species[1].genomes[1]:add_node()
 
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
@@ -827,6 +829,7 @@ function do_this_when_dead()
 
         focus_generation:sort_species()
         local strong_species = {}
+        print(survival_num)
         for g=1, tonumber(survival_num) do
             table.insert(strong_species, focus_generation.species[g])
         end
@@ -844,7 +847,7 @@ function do_this_when_dead()
         for k, v in pairs(strong_species) do
             local new_spec = new_species()
             local new_genomes_num = get_adjusted_fitness_sum(focus_generation:get_genomes(), v.genomes) / #focus_generation:get_genomes()
-            print("creating "..tonumber(new_genomes_num).." genome(s) for generation "..(focus_generation_key + 1).."..")
+            print("creating "..new_genomes_num.." genome(s) for generation "..(focus_generation_key + 1).."..")
             if v.genomes[1].is_carried_over then
                 print("carrying over a genome from previous gen")
             else
@@ -853,9 +856,6 @@ function do_this_when_dead()
             local prev_g = copy_genome(v.genomes[1])
             prev_g.is_carried_over = true
             table.insert(new_spec.genomes, prev_g)
-
-            num_crossovers = 0
-            
             for i=1, new_genomes_num do
                 -- add a check here which when it copies a genome it compares it with all for
                 -- the already created genomes to see if the genome was already created, thus
@@ -863,14 +863,15 @@ function do_this_when_dead()
                 local g = {}
                 if math.random() > 0.5 then
                     g = copy_genome(v.genomes[1])
-                elseif #v.genomes >= 2 then
-                    num_crossovers = num_crossovers + 1
+                else
                     g = crossover(v.genomes[math.random(1, #v.genomes)], v.genomes[math.random(1, #v.genomes)])
                 end
+
+                print(g)
                 mutate(g)
                 table.insert(new_gen.unspecified_genomes, g)
             end
-            print("done! ["..num_crossovers.." total crossovers]")
+            print("done!")
             table.insert(new_gen.species, new_spec)
         end
 
