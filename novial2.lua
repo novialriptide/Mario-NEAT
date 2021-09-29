@@ -497,8 +497,6 @@ function new_species()
     return species
 end
 
-generations = {}
-
 function new_generation()
     local generation = {
         species = {},
@@ -606,7 +604,6 @@ function new_inital_generation(population_size)
         table.insert(generation.species[i].genomes, new_genome())
     end
 
-    table.insert(generations, generation)
     return generation
 end
 
@@ -757,8 +754,7 @@ highest_fitness_score = 0
 highest_fitness_genome = 0
 highest_fitness_score_generation = 0
 
-new_inital_generation(config.pop_size)
-focus_generation = generations[focus_generation_key]
+focus_generation = new_inital_generation(config.pop_size)
 focus_generation:mutate_genomes()
 
 -- focus_generation.species[1].genomes[1].connections = {}
@@ -794,7 +790,9 @@ function write_data(file_name, data)
 end
 
 function do_this_when_dead()
-    local survival_num = #focus_generation.species * config.survival_threshold + 1
+    -- ill optimize the memory (remove the thing where all generations are stored in a list) and take the top 2 genomes to the next generation and just mutate the top 20%
+    -- local survival_num = #focus_generation.species * config.survival_threshold + 1
+    local survival_num = math.min(#focus_generation.species, 2)
     focus_genome.calculated_fitness = focus_genome:get_fitness()
     if focus_genome.calculated_fitness > highest_fitness_score then
         highest_fitness_score = focus_genome.calculated_fitness
@@ -876,10 +874,10 @@ function do_this_when_dead()
 
         new_gen:find_all_species()
         focus_generation_key = focus_generation_key + 1
+        focus_generation = new_gen
         focus_species_key = 1
         focus_genome_key = 1
         highest_fitness_score_generation = 0
-        table.insert(generations, new_gen)
     elseif focus_genome_key == #focus_species.genomes then
         focus_species_key = focus_species_key + 1
         focus_genome_key = 1
@@ -890,7 +888,6 @@ function do_this_when_dead()
         print("ERROR: extinction")
     end
 
-    focus_generation = generations[focus_generation_key]
     focus_species = focus_generation.species[focus_species_key]
     focus_genome = focus_species.genomes[focus_genome_key]
     print("")
