@@ -212,7 +212,7 @@ end
 function new_node(value, type, innov)
     local node = {innov = innov, value = value, type = type, x = 0, y = 0}
     local coords = {}
-    if type == "HIDDEN" then
+    if type == "HIDDEN" or type == "BIAS" then
         coords = random_screen_coords()
     end
     if type == "OUTPUT" then
@@ -225,12 +225,12 @@ function new_node(value, type, innov)
     return node
 end
 
-function new_connection(node1, node2, weight)
-    return {weight = weight, node_in = node1, node_out = node2, innov = 0, enabled = true}
+function new_connection(node1, node2, weight, can_split)
+    return {weight = weight, node_in = node1, node_out = node2, innov = 0, enabled = true, can_split = can_split, is_removable = can_split}
 end
 
 function new_genome()
-    local genome = {hidden_nodes = {}, connections = {}, is_alive = true, calculated_fitness = 0, is_carried_over = false}
+    local genome = {hidden_nodes = {}, bias_nodes = {}, connections = {}, is_alive = true, calculated_fitness = 0, is_carried_over = false}
     
     function genome:get_nodes()
         local nodes = {}
@@ -247,6 +247,12 @@ function new_genome()
             table.insert(nodes, new_node(0, "OUTPUT", _innov))
         end
         for k, v in pairs(genome.hidden_nodes) do
+            _innov = _innov + 1
+            v.innov = _innov
+            table.insert(nodes, v)
+        end
+        
+        for k, v in pairs(genome.bias_nodes) do
             _innov = _innov + 1
             v.innov = _innov
             table.insert(nodes, v)
@@ -278,8 +284,8 @@ function new_genome()
         return {c1, c2}
     end
 
-    function genome:add_connection(node1, node2)
-        local connect_node = new_connection(node1, node2, math.random(config.weight_min_value, config.weight_max_value) + math.random())
+    function genome:add_connection(node1, node2, can_split)
+        local connect_node = new_connection(node1, node2, math.random(config.weight_min_value, config.weight_max_value) + math.random(), can_split)
         -- must add a try except thing to cover nodes that dont exist
         if genome:does_node_exist(node1) and genome:does_node_exist(node2) then
             for k, v in pairs(global_connections) do
@@ -312,21 +318,41 @@ function new_genome()
     end
 
     function genome:add_node()
-        table.insert(genome.hidden_nodes, new_node(0, "HIDDEN"))
         local rand_conn_key = math.random(1, #genome.connections)
         local rand_conn = genome.connections[rand_conn_key]
+        if not rand_conn.can_split then 
+            return false
+        end
+
+        table.insert(genome.hidden_nodes, new_node(0, "HIDDEN"))
         local node_innov = #inputs_keys + config.num_inputs + #genome.hidden_nodes
         local new_connections = genome:split_connection(rand_conn, node_innov)
         genome.connections[rand_conn_key] = nil
         for k, v in pairs(new_connections) do
-            genome:add_connection(v.node_in, v.node_out)
+            genome:add_connection(v.node_in, v.node_out, true)
         end
+
+        return true
     end
 
     function genome:delete_node(innov)
         for k, v in pairs(genome.hidden_nodes) do
             if innov == v.innov then
                 table.remove(genome.hidden_nodes, k)
+            end
+        end
+    end
+
+    function genome:add_bias(innov, value)
+        local b = new_node(value, "BIAS")
+        table.insert(genome.bias_nodes, b)
+        genome:add_connection(config.num_inputs + #inputs_keys + #genome.hidden_nodes + #genome.bias_nodes, innov, false)
+    end
+
+    function genome:remove_bias(innov)
+        for k, v in pairs(genome.bias_nodes) do
+            if v.innov == innov then
+                table.remove(genome.bias_nodes, k)
             end
         end
     end
@@ -347,7 +373,7 @@ function new_genome()
         local available_nodes = {}
 
         for k, v in pairs(nodes) do
-            if v.type ~= "INPUT" then
+            if v.type ~= "INPUT" and v.type ~= "BIAS" then
                 local in_nodes = genome:get_in_nodes(v.innov)
                 local sum = 0
                 for k, v in pairs(in_nodes) do
@@ -384,18 +410,19 @@ function new_genome()
 
     function genome:draw_connections()
         for k, v in pairs(genome.connections) do
-            if genome:does_node_exist(v.node_in) and genome:does_node_exist(v.node_out) and v.enabled then
+            if genome:does_node_exist(v.node_in) and genome:does_node_exist(v.node_out) then
                 local node_in = genome:get_node(v.node_in)
                 local node_out = genome:get_node(v.node_out)
                 local converted_coords = {}
                 local color = color3
                 if v.weight >= 0 then color = color5 end 
+                if not v.enabled then color = {r = 0, g = 0, b = 0} end
                 
                 if node_in.type == "INPUT" then
                     converted_coords = cell_to_screen(node_in.x, node_in.y)
                     gui.drawline(converted_coords.x, converted_coords.y, node_out.x+box_size/2, node_out.y+box_size/2, color)
                 end
-                if node_in.type == "HIDDEN" then
+                if node_in.type == "HIDDEN" or node_in.type == "BIAS" then
                     converted_coords = {x = node_in.x, y = node_in.y}
                     gui.drawline(converted_coords.x, converted_coords.y, node_out.x+box_size/2, node_out.y+box_size/2, color)
                 end
@@ -406,6 +433,10 @@ function new_genome()
     function genome:draw_nodes()
         for k, v in pairs(genome.hidden_nodes) do
             draw_world_tile(v.x, v.y, color1, color2)
+        end
+        
+        for k, v in pairs(genome.bias_nodes) do
+            draw_world_tile(v.x, v.y, color2, color3)
         end
     end
 
@@ -427,7 +458,7 @@ function copy_node(node)
 end
 
 function copy_connection(connection)
-    local c = new_connection(connection.node_in, connection.node_out, connection.weight)
+    local c = new_connection(connection.node_in, connection.node_out, connection.weight, connection.can_split)
     c.innov = connection.innov
 
     return c
@@ -438,6 +469,10 @@ function copy_genome(genome)
     for k, v in pairs(genome.hidden_nodes) do
         local n = copy_node(v)
         table.insert(g.hidden_nodes, n)
+    end
+    for k, v in pairs(genome.bias_nodes) do
+        local n = copy_node(v)
+        table.insert(g.bias_nodes, n)
     end
     for k, v in pairs(genome.connections) do
         local c = copy_connection(v)
@@ -647,37 +682,58 @@ end
 
 function mutate(genome)
     local has_mutate_happen = false
-    if config.node_delete_prob > math.random() then
+    if config.bias_remove_prob > math.random() and not has_mutate_happen  then
+        if #genome.bias_nodes >= 1 then
+            if LOG_MUTATIONS then print("bias deleted") end
+            genome:remove_bias(math.random(1, #genome.bias_nodes))
+            has_mutate_happen = true
+        end
+    end
+
+    if config.bias_add_prob > math.random() and not has_mutate_happen  then
+        if LOG_MUTATIONS then print("bias added") end
+        genome:add_bias(math.random(config.num_inputs+1, #genome:get_nodes()), math.random(config.bias_min_value, config.bias_max_value))
+        has_mutate_happen = true
+    end
+
+    for k, v in pairs(genome.bias_nodes) do
+        if config.bias_mutate_rate > math.random() then
+            if LOG_MUTATIONS then print("bias mutated") end
+            v.value = math.random(config.bias_min_value, config.bias_max_value)
+        end
+    end
+
+    if config.node_delete_prob > math.random() and not has_mutate_happen  then
         if #genome.hidden_nodes > 1 and #genome.connections > 0 then
             if LOG_MUTATIONS then print("node deleted") end
-            genome:delete_node(math.random(1, #genome:get_nodes()))
+            genome:delete_node(math.random(1, #genome.hidden_nodes))
             has_mutate_happen = true
         end
     end
 
-    if config.node_add_prob > math.random() then
+    if config.node_add_prob > math.random() and not has_mutate_happen  then
         if #genome.connections ~= 0 then
             if LOG_MUTATIONS then print("node added") end
-            genome:add_node()
-            has_mutate_happen = true
+            has_mutate_happen = genome:add_node()
         end
     end
 
-    if config.conn_delete_prob > math.random() and #genome.connections > 0 then
-        if #genome.hidden_nodes > 0 and #genome.connections > 1 then
+    if config.conn_delete_prob > math.random() and #genome.connections > 0 and not has_mutate_happen  then
+        local rand_conn = math.random(1, #genome.connections)
+        if #genome.hidden_nodes > 0 and #genome.connections > 1 and genome.connections[rand_conn].is_removable then
             if LOG_MUTATIONS then print("connection deleted") end
-            genome:remove_connection(math.random(1, #genome.connections))
+            genome:remove_connection(rand_conn)
             has_mutate_happen = true
         end
     end
 
-    if config.conn_add_prob > math.random() then
+    if config.conn_add_prob > math.random() and not has_mutate_happen then
         if LOG_MUTATIONS then print("connection added") end
         -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
         if #genome:get_nodes() > config.num_inputs+6 and 0.5 > math.random(0, 1) then
-            genome:add_connection(math.random(config.num_inputs+1, #genome:get_nodes()), math.random(config.num_inputs+6+1, #genome:get_nodes()))
+            genome:add_connection(math.random(config.num_inputs+1, #genome:get_nodes()), math.random(config.num_inputs+6+1, #genome:get_nodes()), true)
         else
-            genome:add_connection(math.random(1, #genome:get_nodes()), math.random(config.num_inputs+1, #genome:get_nodes()))
+            genome:add_connection(math.random(1, #genome:get_nodes()), math.random(config.num_inputs+1, #genome:get_nodes()), true)
         end
         has_mutate_happen = true
     end
@@ -757,20 +813,25 @@ highest_fitness_score_generation = 0
 focus_generation = new_inital_generation(config.pop_size)
 focus_generation:mutate_genomes()
 
--- focus_generation.species[1].genomes[1].connections = {}
--- focus_generation.species[1].genomes[1]:add_connection(config.num_inputs, config.num_inputs+3)
-
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
 
+-- focus_generation.species[1].genomes[1].connections = {}
+-- focus_generation.species[1].genomes[1]:add_connection(config.num_inputs, config.num_inputs+3)
+-- focus_generation.species[1].genomes[1]:add_bias(config.num_inputs+3, 10)
+-- focus_generation.species[1].genomes[1]:add_node()
+
 function write_data(file_name, data)
     local function compile_data(data)
-        local compiled_data = ""
+        local compiled_data = "Mario NEAT Data - Novial"
         for k1, v1 in pairs(data.species) do
             for k2, v2 in pairs(v1.genomes) do
                 compiled_data = compiled_data.."\n species: "..k1..", genome: "..k2.. ", fitness score: "..v2.calculated_fitness
                 for k3, v3 in pairs(v2.hidden_nodes) do
-                    compiled_data = compiled_data.."\n - [node] value: "..v3.value..", type: "..v3.type..", coords: ("..v3.x..","..v3.y..")"
+                    compiled_data = compiled_data.."\n - [node] type: "..v3.type..", coords: ("..v3.x..","..v3.y..")"
+                end
+                for k3, v3 in pairs(v2.hidden_nodes) do
+                    compiled_data = compiled_data.."\n - [bias] value: "..v3.value..", type: "..v3.type..", coords: ("..v3.x..","..v3.y..")"
                 end
 
                 for k3, v3 in pairs(v2.connections) do
