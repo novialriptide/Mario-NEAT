@@ -329,6 +329,7 @@ function new_genome()
         local rand_conn_key = math.random(1, #genome.connections)
         local rand_conn = genome.connections[rand_conn_key]
         local node_innov = #inputs_keys + config.num_inputs + #genome.hidden_nodes
+        print(rand_conn, rand_conn_key)
         local new_connections = genome:split_connection(rand_conn, node_innov)
         genome.connections[rand_conn_key] = nil
         for k, v in pairs(new_connections) do
@@ -780,6 +781,7 @@ focus_generation:mutate_genomes()
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
 -- focus_genome:add_bias(config.num_inputs + #inputs_keys - 3)
+-- focus_genome:add_connection(math.random(config.num_inputs+1, #focus_genome:get_nodes()), math.random(config.num_inputs+6+1, #focus_genome:get_nodes()))
 
 function write_data(file_name, data)
     local function compile_data(data)
@@ -808,8 +810,9 @@ function write_data(file_name, data)
 end
 
 function do_this_when_dead()
-    -- ill optimize the memory (remove the thing where all generations are stored in a list) and take the top 2 genomes to the next generation and just mutate the top 20%
     -- local survival_num = #focus_generation.species * config.survival_threshold + 1
+    print(focus_genome)
+
     local survival_num = math.min(#focus_generation.species, 2)
     focus_genome.calculated_fitness = focus_genome:get_fitness()
     if focus_genome.calculated_fitness > highest_fitness_score then
