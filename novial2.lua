@@ -329,7 +329,7 @@ function new_genome()
         local rand_conn_key = math.random(1, #genome.connections)
         local rand_conn = genome.connections[rand_conn_key]
         local node_innov = #inputs_keys + config.num_inputs + #genome.hidden_nodes
-        print(rand_conn, rand_conn_key)
+        print(rand_conn, rand_conn_key, genome.connections)
         local new_connections = genome:split_connection(rand_conn, node_innov)
         genome.connections[rand_conn_key] = nil
         for k, v in pairs(new_connections) do
