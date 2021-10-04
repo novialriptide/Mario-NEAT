@@ -780,7 +780,6 @@ focus_generation:mutate_genomes()
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
 -- focus_genome:add_bias(config.num_inputs + #inputs_keys - 3)
-print(focus_genome)
 
 function write_data(file_name, data)
     local function compile_data(data)
