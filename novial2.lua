@@ -282,7 +282,7 @@ function new_genome()
     end
 
     function genome:add_connection(node1, node2)
-        if genome:get_node(node2).type == "BIAS" or genome:get_node().type == "INPUT" then
+        if genome:get_node(node2).type == "BIAS" or genome:get_node(node2).type == "INPUT" then
             return false
         end
 
