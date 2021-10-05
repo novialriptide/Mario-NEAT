@@ -233,7 +233,7 @@ function new_connection(node1, node2, weight)
 end
 
 function new_genome()
-    local genome = {hidden_nodes = {new_node(1, "BIAS")}, connections = {}, is_alive = true, calculated_fitness = 0, is_carried_over = false}
+    local genome = {hidden_nodes = {}, connections = {}, is_alive = true, calculated_fitness = 0, is_carried_over = false}
     
     function genome:get_nodes()
         local nodes = {}
@@ -249,6 +249,10 @@ function new_genome()
             _innov = _innov + 1
             table.insert(nodes, new_node(0, "OUTPUT", _innov))
         end
+
+        _innov = _innov + 1
+        table.insert(nodes, new_node(1, "BIAS", _innov))
+
         for k, v in pairs(genome.hidden_nodes) do
             _innov = _innov + 1
             v.innov = _innov
@@ -364,7 +368,7 @@ function new_genome()
         local available_nodes = {}
 
         for k, v in pairs(nodes) do
-            if v.type ~= "INPUT" then
+            if v.type ~= "INPUT" and v.type ~= "BIAS" then
                 local in_nodes = genome:get_in_nodes(v.innov)
                 local sum = 0
                 for k, v in pairs(in_nodes) do
@@ -793,8 +797,10 @@ function write_data(file_name, data)
         for k1, v1 in pairs(data.species) do
             for k2, v2 in pairs(v1.genomes) do
                 compiled_data = compiled_data.."\n species: "..k1..", genome: "..k2.. ", fitness score: "..v2.calculated_fitness
-                for k3, v3 in pairs(v2.hidden_nodes) do
-                    compiled_data = compiled_data.."\n - [node] value: "..v3.value..", type: "..v3.type..", coords: ("..v3.x..","..v3.y..")"
+                for k3, v3 in pairs(v2:get_nodes()) do
+                    if v3.type ~= "INPUT" then
+                        compiled_data = compiled_data.."\n - [node] value: "..v3.value..", type: "..v3.type..", coords: ("..v3.x..","..v3.y..")"
+                    end
                 end
 
                 for k3, v3 in pairs(v2.connections) do

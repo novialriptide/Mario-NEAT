@@ -10,7 +10,7 @@
 config = {
     fitness_criterion     = max,
     fitness_threshold     = 3000, -- found solution
-    pop_size              = 300, -- 300,
+    pop_size              = 5, -- 300,
     reset_on_extinction   = 0,
 
     -- [DefaultGenome]
@@ -21,8 +21,8 @@ config = {
     -- feed_forward            = False
     compatibility_disjoint_coefficient = 1.0,
     compatibility_weight_coefficient   = 0.6,
-    conn_add_prob           = 0.50,
-    conn_delete_prob        = 0.50,
+    conn_add_prob           = 0.75,
+    conn_delete_prob        = 0.75,
     node_add_prob           = 0.25,
     node_delete_prob        = 0.25,
     bias_add_prob           = 0.10,
