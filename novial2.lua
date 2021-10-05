@@ -672,7 +672,7 @@ function mutate(genome)
 
     if config.bias_add_prob > math.random() then
         if LOG_MUTATIONS then print("bias added") end
-        genome:add_bias(math.random(config.num_inputs + 1, genome:get_nodes()))
+        genome:add_bias(math.random(config.num_inputs + 1, #genome:get_nodes()))
         has_mutate_happen = true
     end
 
