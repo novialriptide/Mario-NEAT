@@ -282,7 +282,7 @@ function new_genome()
     end
 
     function genome:add_connection(node1, node2)
-        if genome:get_node(node2).type == "BIAS" then
+        if genome:get_node(node2).type == "BIAS" or genome:get_node().type == "INPUT" then
             return false
         end
 
@@ -672,7 +672,7 @@ function mutate(genome)
 
     if config.bias_add_prob > math.random() then
         if LOG_MUTATIONS then print("bias added") end
-        genome:add_bias(math.random(config.num_inputs + 1, config.num_inputs + #inputs_keys))
+        genome:add_bias(math.random(config.num_inputs + 1, genome:get_nodes()))
         has_mutate_happen = true
     end
 
