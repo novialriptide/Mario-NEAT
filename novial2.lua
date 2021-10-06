@@ -508,7 +508,11 @@ function new_species()
         end
         
         local function compare(a,b)
-            return a.calculated_fitness > b.calculated_fitness and #a.hidden_nodes < #b.hidden_nodes and #a.connections < #b.connections
+            if a.calculated_fitness ~= b.calculated_fitness then
+                return a.calculated_fitness > b.calculated_fitness
+            end
+
+            return #a.hidden_nodes + #a.connections < #b.hidden_nodes + #b.connections
         end
 
         table.sort(species.genomes, compare)
