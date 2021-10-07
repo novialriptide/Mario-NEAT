@@ -32,13 +32,13 @@ config = {
     -- aggregation_default     = sum
     -- aggregation_options     = sum
     aggregation_mutate_rate = 0.0,
-    bias_init_mean          = 0.0,
-    bias_init_stdev         = 1.0,
-    bias_replace_rate       = 0.1,
-    bias_mutate_rate        = 0.7,
-    bias_mutate_power       = 0.5,
-    bias_max_value          = 30.0,
-    bias_min_value          = -30.0,
+    -- bias_init_mean          = 0.0,
+    -- bias_init_stdev         = 1.0,
+    -- bias_replace_rate       = 0.1,
+    -- bias_mutate_rate        = 0.7,
+    -- bias_mutate_power       = 0.5,
+    -- bias_max_value          = 30.0,
+    -- bias_min_value          = -30.0,
     response_init_mean      = 1.0,
     response_init_stdev     = 0.1,
     response_replace_rate   = 0.1,
@@ -55,10 +55,10 @@ config = {
     weight_replace_rate     = 0.1,
     weight_mutate_power     = 0.5,
     enabled_default         = true,
-    enabled_mutate_rate     = 0.01,
+    enabled_mutate_rate     = 0.2,
 
     -- [DefaultSpeciesSet]
-    compatibility_threshold = 3.0,
+    compatibility_threshold = 1.0,
 
     -- [DefaultStagnation]
     -- species_fitness_func = max
@@ -66,7 +66,7 @@ config = {
 
     -- [DefaultReproduction]
     elitism            = 2,
-    survival_threshold = 0.2,
+    survival_threshold = 0.1,
 }
 
 return config

@@ -1,6 +1,7 @@
-   
 -- This was programmed by Novial // Andrew
--- Paper used: http://nn.cs.utexas.edu/downloads/papers/stanley.ec02.pdf
+-- Papers used: http://nn.cs.utexas.edu/downloads/papers/stanley.ec02.pdf
+--              https://neptune.ai/blog/adaptive-mutation-in-genetic-algorithm-with-python-examples
+--              https://www.mdpi.com/2078-2489/10/12/390/pdf
 
 config = require("config")
 
@@ -8,6 +9,7 @@ math.randomseed(os.time())
 math.random(); math.random(); math.random() -- agony agony agony agony agony agony agony
 
 LOG_MUTATIONS = false
+crossover_rate = 0.5
 box_size = 4
 x_offset = 20
 y_offset = 40
@@ -233,7 +235,19 @@ function new_connection(node1, node2, weight)
 end
 
 function new_genome()
-    local genome = {hidden_nodes = {}, connections = {}, is_alive = true, calculated_fitness = 0, is_carried_over = false}
+    local genome = {
+        hidden_nodes = {}, connections = {}, 
+        is_alive = true, calculated_fitness = 0, is_carried_over = false,
+        mutation_rates = {
+            bias_add_prob = config.bias_add_prob,
+            conn_add_prob = config.conn_add_prob,
+            conn_delete_prob = config.conn_delete_prob,
+            node_add_prob = config.node_add_prob,
+            node_delete_prob = config.node_delete_prob,
+            enabled_mutate_rate = config.enabled_mutate_rate,
+            weight_mutate_rate = config.weight_mutate_rate
+        }
+    }
     
     function genome:get_nodes()
         local nodes = {}
@@ -405,12 +419,13 @@ function new_genome()
 
     function genome:draw_connections()
         for k, v in pairs(genome.connections) do
-            if genome:does_node_exist(v.node_in) and genome:does_node_exist(v.node_out) and v.enabled then
+            if genome:does_node_exist(v.node_in) and genome:does_node_exist(v.node_out) then
                 local node_in = genome:get_node(v.node_in)
                 local node_out = genome:get_node(v.node_out)
                 local converted_coords = {}
                 local color = color3
                 if v.weight >= 0 then color = color5 end 
+                if not v.enabled then color = {r = 0, g = 0, b = 255} end
                 
                 if node_in.type == "INPUT" then
                     converted_coords = cell_to_screen(node_in.x, node_in.y)
@@ -424,8 +439,10 @@ function new_genome()
     end
 
     function genome:draw_nodes()
-        for k, v in pairs(genome.hidden_nodes) do
-            draw_world_tile(v.x, v.y, color1, color2)
+        for k, v in pairs(genome:get_nodes()) do
+            if v.type == "BIAS" or v.type == "HIDDEN" then
+                draw_world_tile(v.x, v.y, color1, color2)
+            end
         end
     end
 
@@ -462,6 +479,10 @@ function copy_genome(genome)
     for k, v in pairs(genome.connections) do
         local c = copy_connection(v)
         table.insert(g.connections, c)
+    end
+
+    for k, v in pairs(genome.mutation_rates) do
+        g.mutation_rates.k = v
     end
     
     return g
@@ -669,22 +690,37 @@ function get_connection_innovs(connections)
     return innovs
 end
 
+function adaptive_mutate(genome, average_fitness)
+    local percentage_increase = 0
+    if genome.calculated_fitness >= average_fitness then
+        print("dec")
+        percentage_increase = 0.95
+    else
+        print("inc")
+        percentage_increase = 1.05
+    end
+    
+    for k, v in pairs(genome.mutation_rates) do
+        genome.mutation_rates.k2 = v * percentage_increase
+    end
+end
+
 function mutate(genome)
     local has_mutate_happen = false
-    if config.node_delete_prob > math.random() then
+    if genome.mutation_rates.node_delete_prob > math.random() then
         if #genome.hidden_nodes > 1 and #genome.connections > 0 then
             if LOG_MUTATIONS then print("node deleted") end
             has_mutate_happen = genome:delete_node(math.random(1, #genome:get_nodes()))
         end
     end
 
-    if config.bias_add_prob > math.random() then
+    if genome.mutation_rates.bias_add_prob > math.random() then
         if LOG_MUTATIONS then print("bias added") end
         genome:add_bias(math.random(config.num_inputs + 1, #genome:get_nodes()))
         has_mutate_happen = true
     end
 
-    if config.node_add_prob > math.random() then
+    if genome.mutation_rates.node_add_prob > math.random() then
         if #genome.connections ~= 0 then
             if LOG_MUTATIONS then print("node added") end
             genome:add_node()
@@ -692,7 +728,7 @@ function mutate(genome)
         end
     end
 
-    if config.conn_delete_prob > math.random() and #genome.connections > 0 then
+    if genome.mutation_rates.conn_delete_prob > math.random() and #genome.connections > 0 then
         if #genome.hidden_nodes > 0 and #genome.connections > 1 then
             if LOG_MUTATIONS then print("connection deleted") end
             genome:remove_connection(math.random(1, #genome.connections))
@@ -700,7 +736,7 @@ function mutate(genome)
         end
     end
 
-    if config.conn_add_prob > math.random() then
+    if genome.mutation_rates.conn_add_prob > math.random() then
         if LOG_MUTATIONS then print("connection added") end
         -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
         if #genome:get_nodes() > config.num_inputs+6 and 0.5 > math.random(0, 1) then
@@ -711,13 +747,13 @@ function mutate(genome)
     end
 
     for k, v in pairs(genome.connections) do
-        if config.weight_mutate_rate > math.random() then
+        if genome.mutation_rates.weight_mutate_rate > math.random() then
             v.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
             if LOG_MUTATIONS then print("weight mutated ("..v.weight..")") end
             -- has_mutate_happen = true
         end
         
-        if config.enabled_default and config.enabled_mutate_rate > math.random() then
+        if config.enabled_default and genome.mutation_rates.enabled_mutate_rate > math.random() then
             if 0.5 > math.random() then
                 if LOG_MUTATIONS then print("connection enabled") end
                 v.enabled = true
@@ -813,6 +849,10 @@ function write_data(file_name, data)
                     if not v3.enabled then enabled_str = "false" end
                     compiled_data = compiled_data.."\n - [conn] innov: "..v3.innov..", weight: "..v3.weight..", node_in: "..v3.node_in..", node_out: "..v3.node_out..", enabled: "..enabled_str
                 end
+
+                for k3, v3 in pairs(v2.mutation_rates) do
+                    compiled_data = compiled_data.."\n - [mrate] "..k3..": "..v3
+                end
             end
         end
 
@@ -824,8 +864,8 @@ function write_data(file_name, data)
 end
 
 function do_this_when_dead()
-    -- local survival_num = #focus_generation.species * config.survival_threshold + 1
-    local survival_num = math.min(#focus_generation.species, 2)
+    local survival_num = #focus_generation.species * config.survival_threshold + 1
+    -- local survival_num = math.min(#focus_generation.species, 2)
     focus_genome.calculated_fitness = focus_genome:get_fitness()
     if focus_genome.calculated_fitness > highest_fitness_score then
         highest_fitness_score = focus_genome.calculated_fitness
@@ -859,8 +899,14 @@ function do_this_when_dead()
         end
 
         focus_generation:sort_species()
+        local average_fitness = focus_generation:get_fitness_sum() / #focus_generation.get_genomes()
+        for k1, v1 in pairs(focus_generation.species) do
+            for k2, v2 in pairs(v1.genomes) do
+                adaptive_mutate(v2, average_fitness)
+            end
+        end
+
         local strong_species = {}
-        
         for g=1, tonumber(survival_num) do
             table.insert(strong_species, focus_generation.species[g])
         end
@@ -888,11 +934,8 @@ function do_this_when_dead()
             prev_g.is_carried_over = true
             table.insert(new_spec.genomes, prev_g)
             for i=1, new_genomes_num do
-                -- add a check here which when it copies a genome it compares it with all for
-                -- the already created genomes to see if the genome was already created, thus
-                -- elimating copies that would give the same result
                 local g = {}
-                if math.random() > 0.5 then
+                if math.random() > crossover_rate then
                     g = copy_genome(v.genomes[1])
                 else
                     g = crossover(v.genomes[math.random(1, #v.genomes)], v.genomes[math.random(1, #v.genomes)])
@@ -954,8 +997,8 @@ end
 is_timer_set = false
 start_timeout = 0
 
-function is_not_moving()
-    return 0 == memory.readbyte(0x0057)
+function is_moving()
+    return 0 ~= memory.readbyte(0x0057)
 end
 
 function is_dead()
@@ -965,11 +1008,11 @@ end
 emu.poweron()
 
 while (true) do
-    if is_not_moving() and not is_timer_set and get_game_timer() ~= 0 then
+    if not is_moving() and not is_timer_set and get_game_timer() ~= 0 then
         is_timer_set = true
         start_timeout = get_game_timer()
     end
-    if not is_not_moving() then
+    if is_moving() then
         is_timer_set = false
     end
 
