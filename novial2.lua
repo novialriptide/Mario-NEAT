@@ -707,11 +707,29 @@ function adaptive_mutate(genome, average_fitness)
         new_m_rates[k] = v * percentage_increase
     end
     genome.mutation_rates = new_m_rates
-    print(genome.mutation_rates)
 end
 
 function mutate(genome)
     local has_mutate_happen = false
+    for k, v in pairs(genome.connections) do
+        if genome.mutation_rates.weight_mutate_rate > math.random() then
+            v.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
+            if LOG_MUTATIONS then print("weight mutated ("..v.weight..")") end
+            has_mutate_happen = true
+        end
+        
+        if config.enabled_default and genome.mutation_rates.enabled_mutate_rate > math.random() then
+            if 0.5 > math.random() then
+                if LOG_MUTATIONS then print("connection enabled") end
+                v.enabled = true
+            else
+                if LOG_MUTATIONS then print("connection disabled") end
+                v.enabled = false
+            end
+            has_mutate_happen = true
+        end
+    end
+
     if genome.mutation_rates.node_delete_prob > math.random() then
         if #genome.hidden_nodes > 1 and #genome.connections > 0 then
             if LOG_MUTATIONS then print("node deleted") end
@@ -751,24 +769,6 @@ function mutate(genome)
         end
     end
 
-    for k, v in pairs(genome.connections) do
-        if genome.mutation_rates.weight_mutate_rate > math.random() then
-            v.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
-            if LOG_MUTATIONS then print("weight mutated ("..v.weight..")") end
-            -- has_mutate_happen = true
-        end
-        
-        if config.enabled_default and genome.mutation_rates.enabled_mutate_rate > math.random() then
-            if 0.5 > math.random() then
-                if LOG_MUTATIONS then print("connection enabled") end
-                v.enabled = true
-            else
-                if LOG_MUTATIONS then print("connection disabled") end
-                v.enabled = false
-            end
-            -- has_mutate_happen = true
-        end
-    end
     if not has_mutate_happen then
         mutate(genome)
     end
