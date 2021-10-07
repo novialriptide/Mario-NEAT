@@ -481,9 +481,11 @@ function copy_genome(genome)
         table.insert(g.connections, c)
     end
 
+    local new_m_rates = {}
     for k, v in pairs(genome.mutation_rates) do
-        g.mutation_rates.k = v
+        new_m_rates[k] = v
     end
+    g.mutation_rates = new_m_rates
     
     return g
 end
@@ -700,9 +702,12 @@ function adaptive_mutate(genome, average_fitness)
         percentage_increase = 1.05
     end
     
+    local new_m_rates = {}
     for k, v in pairs(genome.mutation_rates) do
-        genome.mutation_rates.k2 = v * percentage_increase
+        new_m_rates[k] = v * percentage_increase
     end
+    genome.mutation_rates = new_m_rates
+    print(genome.mutation_rates)
 end
 
 function mutate(genome)
