@@ -869,8 +869,8 @@ function write_data(file_name, data)
 end
 
 function do_this_when_dead()
-    local survival_num = #focus_generation.species * config.survival_threshold + 1
-    -- local survival_num = math.min(#focus_generation.species, 2)
+    -- local survival_num = #focus_generation.species * config.survival_threshold + 1
+    local survival_num = math.min(#focus_generation.species, 2)
     focus_genome.calculated_fitness = focus_genome:get_fitness()
     if focus_genome.calculated_fitness > highest_fitness_score then
         highest_fitness_score = focus_genome.calculated_fitness
