@@ -913,7 +913,7 @@ function do_this_when_dead()
 
         local strong_species = {}
         for k, v in pairs(focus_generation.species) do
-            if v.calculated_fitness >= average_fitness then
+            if v.genomes[1].calculated_fitness >= average_fitness then
                 table.insert(strong_species, v)
             end
         end
