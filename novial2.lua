@@ -916,7 +916,8 @@ function do_this_when_dead()
         local average_fitness = focus_generation:get_fitness_sum() / #focus_generation.get_genomes()
         for k1, v1 in pairs(focus_generation.species) do
             for k2, v2 in pairs(v1.genomes) do
-                adaptive_mutate(v2, average_fitness)
+                -- adaptive_mutate(v2, average_fitness)
+                local g = "d"
             end
         end
 
