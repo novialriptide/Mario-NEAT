@@ -4,6 +4,7 @@
 --              https://www.mdpi.com/2078-2489/10/12/390/pdf
 
 config = require("config")
+
 math.randomseed(os.time())
 math.random(); math.random(); math.random() -- agony agony agony agony agony agony agony
 
@@ -20,6 +21,7 @@ color5 = {r = 22, g = 99, b = 32}
 
 mario_x = 0
 mario_y = 0
+x_progress = 0
 
 mario_map_x = 0
 mario_map_y = 0
@@ -876,6 +878,7 @@ function print_data()
 end
 
 function do_this_when_dead()
+    x_progress = 0
     -- local survival_num = #focus_generation.species * config.survival_threshold + 1
     -- local survival_num = math.min(#focus_generation.species, 2)
     focus_genome.calculated_fitness = focus_genome:get_fitness()
@@ -916,8 +919,7 @@ function do_this_when_dead()
         local average_fitness = focus_generation:get_fitness_sum() / #focus_generation.get_genomes()
         for k1, v1 in pairs(focus_generation.species) do
             for k2, v2 in pairs(v1.genomes) do
-                -- adaptive_mutate(v2, average_fitness)
-                local g = "d"
+                adaptive_mutate(v2, average_fitness)
             end
         end
 
@@ -1001,6 +1003,7 @@ function test_next_gen()
         joypad.set(1, {start = true})
         emu.frameadvance()
         joypad.set(1, {start = false})
+        x_progress = 0
     end
     
     -- new gen
@@ -1025,6 +1028,16 @@ function is_moving()
     return 0 ~= memory.readbyte(0x0057)
 end
 
+function is_moving2()
+    return mario_x > x_progress
+end
+
+function update_x_progress()
+    if mario_x > x_progress then
+        x_progress = mario_x
+    end
+end
+
 function is_dead()
     return memory.readbyte(0x000E) == 0x0B or memory.readbyte(0x000E) == 0x06 -- 6 is dead, 11 is dying
 end
@@ -1032,14 +1045,6 @@ end
 emu.poweron()
 
 while (true) do
-    if not is_moving() and not is_timer_set and get_game_timer() ~= 0 then
-        is_timer_set = true
-        start_timeout = get_game_timer()
-    end
-    if is_moving() then
-        is_timer_set = false
-    end
-
     get_positions()
     ai_inputs = get_map()
     read_enemies(ai_inputs)
@@ -1049,14 +1054,22 @@ while (true) do
     focus_genome:draw_nodes()
     focus_genome:eval()
     draw_buttons()
-    
     draw_info(focus_generation_key, focus_species_key, focus_genome_key, focus_genome:get_fitness())
 
+    if not is_moving2() and not is_timer_set and get_game_timer() ~= 0 then
+        is_timer_set = true
+        start_timeout = get_game_timer()
+    end
+    if is_moving2() then
+        is_timer_set = false
+    end
     if get_game_timer() <= start_timeout - 8 and is_timer_set then
         is_timer_set = false
         do_this_when_dead()
     end
+    
     test_next_gen()
+    update_x_progress()
 
     emu.frameadvance()
 end
