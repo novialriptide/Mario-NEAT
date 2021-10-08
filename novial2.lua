@@ -823,7 +823,7 @@ highest_fitness_score = 0
 highest_fitness_genome = 0
 highest_fitness_score_generation = 0
 
-focus_generation = new_inital_generation(config.pop_size)
+focus_generation = new_inital_generation(config.population)
 focus_generation:mutate_genomes()
 
 -- focus_generation.species[1].genomes[1]:add_connection(config.num_inputs, config.num_inputs+3)
@@ -934,8 +934,12 @@ function do_this_when_dead()
         local new_gen = new_generation()
         for k, v in pairs(strong_species) do
             local new_spec = new_species()
-            local new_genomes_num = get_adjusted_fitness_sum(focus_generation:get_genomes(), v.genomes) / #focus_generation:get_genomes()
-            print("creating "..new_genomes_num.." genome(s) for generation "..(focus_generation_key + 1).."..")
+            local new_genomes_num = 0
+            if config.use_adjusted_fitness then 
+                new_genomes_num = get_adjusted_fitness_sum(focus_generation:get_genomes(), v.genomes) / #focus_generation:get_genomes()
+            else
+                new_genomes_num = (v.get_average_fitness() / (focus_generation:get_fitness_sum() / #focus_generation:get_genomes())) * config.population
+            print("creating "..tonumber(new_genomes_num).." genome(s) for generation "..(focus_generation_key + 1).."..")
             if v.genomes[1].is_carried_over then
                 print("carrying over a genome from previous gen")
             else
