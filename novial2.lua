@@ -4,12 +4,10 @@
 --              https://www.mdpi.com/2078-2489/10/12/390/pdf
 
 config = require("config")
-
 math.randomseed(os.time())
 math.random(); math.random(); math.random() -- agony agony agony agony agony agony agony
 
 LOG_MUTATIONS = false
-crossover_rate = 0.5
 box_size = 4
 x_offset = 20
 y_offset = 40
@@ -29,6 +27,8 @@ mario_map_y = 0
 mario_x_screen_scroll = 0
 moving_objects = {}
 inputs_keys = {"A", "B", "right", "left", "up", "down"}
+
+prefix = {error = "[Error]: ", warning = "[Warning]: ", network = "[Network]: "}
 
 function sigmoid(x)
     return 1 / (1 + math.pow(2.71828, -x))
@@ -110,7 +110,6 @@ function read_enemies(level)
     local enemies_drawn = 0
     for _e=0, 4, 1 do
         if memory.readbyte(0x000F + _e) ~= 0 then
-            -- local ex = memory.readbyte(0x0087 + _e) - 16*2
             local ex = memory.readbyte(0x6E + _e)*0x100 + memory.readbyte(0x87+_e) - mario_x + 16*9
             local ey = memory.readbyte(0x00CF + _e)
             enemies_drawn = enemies_drawn + 1
@@ -231,7 +230,7 @@ function new_node(value, type, innov)
 end
 
 function new_connection(node1, node2, weight)
-    return {weight = weight, node_in = node1, node_out = node2, innov = 0, enabled = true}
+    return {weight = weight, node_in = node1, node_out = node2, innov = 0, enabled = true, mutation_modifier = 1}
 end
 
 function new_genome()
@@ -466,6 +465,7 @@ end
 function copy_connection(connection)
     local c = new_connection(connection.node_in, connection.node_out, connection.weight)
     c.innov = connection.innov
+    c.mutation_modifier = connection.mutation_modifier
 
     return c
 end
@@ -551,11 +551,11 @@ function new_generation()
     }
 
     function generation:mutate_genomes()
-        print("Mutating...")
+        print(prefix.network.."Mutating...")
         for k, v in pairs(generation.species) do
             v:mutate_genomes()
         end
-        print("Mutation Complete!")
+        print(prefix.network.."Mutation Complete!")
     end
 
     function generation:_find_species(genome)
@@ -582,7 +582,7 @@ function new_generation()
             local species = new_species()
             table.insert(species.genomes, genome)
             table.insert(generation.species, species)
-            print("new species found")
+            print(prefix.network.."Found a new species")
         end
     end
 
@@ -695,10 +695,10 @@ end
 function adaptive_mutate(genome, average_fitness)
     local percentage_increase = 0
     if genome.calculated_fitness >= average_fitness then
-        print("dec")
+        if LOG_MUTATIONS then print("dec") end
         percentage_increase = 0.95
     else
-        print("inc")
+        if LOG_MUTATIONS then print("inc") end
         percentage_increase = 1.05
     end
     
@@ -863,9 +863,16 @@ function write_data(file_name, data)
 
         return compiled_data
     end
-    file = io.open("_saves/"..file_name..".txt", "w")
+    file = io.open("saves/"..file_name..".txt", "w")
     file:write(compile_data(data))
     file:close()
+end
+
+function print_data()
+    print("")
+    print(prefix.network.."Total Pop           : "..focus_generation:get_population_size())
+    print(prefix.network.."Total Species       : "..#focus_generation.species)
+    print(prefix.network.."Total Species Pop   : "..#focus_species.genomes)
 end
 
 function do_this_when_dead()
@@ -875,13 +882,15 @@ function do_this_when_dead()
     if focus_genome.calculated_fitness > highest_fitness_score then
         highest_fitness_score = focus_genome.calculated_fitness
         highest_fitness_genome = copy_genome(focus_genome)
+        print(prefix.network.."Highest Fitness Net : "..highest_fitness_score)
     end
     if focus_genome.calculated_fitness > highest_fitness_score_generation then
         highest_fitness_score_generation = focus_genome.calculated_fitness
+        print(prefix.network.."Highest Fitness Gen : "..highest_fitness_score_generation)
     end
     if focus_genome.calculated_fitness >= config.fitness_threshold then
         write_data("gen"..focus_generation_key, focus_generation)
-        print("ya boi reached it..")
+        print(prefix.network.."ya boi reached it..")
         return
     end
     emu.poweron()
@@ -891,7 +900,7 @@ function do_this_when_dead()
         end
         
         if num_no_changes > 10 then
-            print("!! WARNING: fitness score is not making improvements. Breeding only 2 species")
+            print(prefix.warning.."Fitness score is not making improvements. Breeding only 2 species")
             survival_num = 2
             num_no_changes = 0
         end
@@ -920,7 +929,7 @@ function do_this_when_dead()
 
         -- for g=1, survival_num do table.insert(strong_species, focus_generation.species[g]) end
 
-        print(#strong_species.." species have survived to the next generation")
+        print(prefix.network..#strong_species.." species have survived to the next generation")
 
         local function compare1(a,b)
             return a.genomes[1].calculated_fitness > b.genomes[1].calculated_fitness
@@ -932,6 +941,7 @@ function do_this_when_dead()
 
         table.sort(strong_species, compare1)
         local new_gen = new_generation()
+        local carried_over_num = 0
         for k, v in pairs(strong_species) do
             local new_spec = new_species()
             local new_genomes_num = 0
@@ -940,18 +950,16 @@ function do_this_when_dead()
             else
                 new_genomes_num = (v.get_average_fitness() / (focus_generation:get_fitness_sum() / #focus_generation:get_genomes())) * config.population
             end
-            print("creating "..tonumber(new_genomes_num).." genome(s) for generation "..(focus_generation_key + 1).."..")
+            print(prefix.network.."Creating "..tonumber(new_genomes_num).." genome(s) for generation "..(focus_generation_key + 1).."..")
             if v.genomes[1].is_carried_over then
-                print("carrying over a genome from previous gen")
-            else
-                print("no genome to carry over from previous gen")
+                carried_over_num = carried_over_num + 1
             end
             local prev_g = copy_genome(v.genomes[1])
             prev_g.is_carried_over = true
             table.insert(new_spec.genomes, prev_g)
             for i=1, new_genomes_num do
                 local g = {}
-                if math.random() > crossover_rate then
+                if math.random() > config.crossover_rate then
                     g = copy_genome(v.genomes[1])
                 else
                     g = crossover(v.genomes[math.random(1, #v.genomes)], v.genomes[math.random(1, #v.genomes)])
@@ -960,9 +968,11 @@ function do_this_when_dead()
                 mutate(g)
                 table.insert(new_gen.unspecified_genomes, g)
             end
-            print("done!")
+            print(prefix.network.."Success!")
             table.insert(new_gen.species, new_spec)
         end
+
+        print(prefix.network.."Carried over "..carried_over_num.." species")
 
         new_gen:find_all_species()
         focus_generation_key = focus_generation_key + 1
@@ -977,17 +987,12 @@ function do_this_when_dead()
         focus_genome_key = focus_genome_key + 1
     end
     if focus_generation:get_population_size() == 0 then
-        print("ERROR: extinction")
+        print(prefix.error.."Extinction")
     end
 
+    -- print_data()
     focus_species = focus_generation.species[focus_species_key]
     focus_genome = focus_species.genomes[focus_genome_key]
-    print("")
-    print("Total Pop           : "..focus_generation:get_population_size())
-    print("Total Species       : "..#focus_generation.species)
-    print("Total Species Pop   : "..#focus_species.genomes)
-    print("Highest Fitness Net : "..highest_fitness_score)
-    print("Highest Fitness Gen : "..highest_fitness_score_generation)
 end
 
 function test_next_gen()
@@ -1004,8 +1009,10 @@ function test_next_gen()
 end
 
 function draw_info(generation, species, genome, fitness)
-    local text = {"gen: "..generation, "species: "..species, "genome: "..genome, "fitness: "..fitness}
-    for i=0, 3 do
+    local text = {
+        "gen: "..generation, "species: "..species, "genome: "..genome, "fitness: "..fitness
+    }
+    for i=0, #text-1 do
         gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16+8*i, text[i+1], color1, color2)
     end
 end

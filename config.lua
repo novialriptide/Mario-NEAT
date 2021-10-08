@@ -26,13 +26,15 @@ config = {
     weight_mutate_rate      = 0.8,
     enabled_default         = true,
     enabled_mutate_rate     = 0.2,
+    adaptive_mutate_rate    = 0.05,
 
     -- [DefaultSpeciesSet]
     compatibility_threshold = 1.0,
 
     -- [DefaultReproduction]
     survival_threshold = 0.1,
-    use_adjusted_fitness = false
+    use_adjusted_fitness = true,
+    crossover_rate = 0.5
 }
 
 return config
