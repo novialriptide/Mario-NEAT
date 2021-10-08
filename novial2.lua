@@ -511,7 +511,7 @@ function new_species()
             sum = sum + v.calculated_fitness
         end
 
-        return sum / #genomes
+        return sum / #species.genomes
     end
 
     function species:get_fitness_sum()
@@ -863,7 +863,7 @@ function write_data(file_name, data)
 
         return compiled_data
     end
-    file = io.open("saves/"..file_name..".txt", "w")
+    file = io.open("_saves/"..file_name..".txt", "w")
     file:write(compile_data(data))
     file:close()
 end
