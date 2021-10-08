@@ -145,7 +145,6 @@ function map_to_list(level_data)
             table.insert(map_list, {value = level_data[r][c], x = c, y = r})
         end
     end
-
     return map_list
 end
 
@@ -174,7 +173,7 @@ function get_diff_genes(genome1, genome2)
         end
         
         for k, v in pairs(t1.connections) do
-            if has_value(t2.connections, v.innov) == false then
+            if not has_value(t2.connections, v.innov) then
                 table.insert(diff_genes, v)
             end
         end
@@ -1067,7 +1066,7 @@ while (true) do
         is_timer_set = false
         do_this_when_dead()
     end
-    
+
     test_next_gen()
     update_x_progress()
 
