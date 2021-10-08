@@ -913,10 +913,13 @@ function do_this_when_dead()
 
         local strong_species = {}
         for k, v in pairs(focus_generation.species) do
-            if v.genomes[1].calculated_fitness >= average_fitness then
+            if v.genomes[1].calculated_fitness == highest_fitness_score_generation then
                 table.insert(strong_species, v)
             end
         end
+
+        -- for g=1, survival_num do table.insert(strong_species, focus_generation.species[g]) end
+
         print(#strong_species.." species have survived to the next generation")
 
         local function compare1(a,b)
