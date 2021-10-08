@@ -939,6 +939,7 @@ function do_this_when_dead()
                 new_genomes_num = get_adjusted_fitness_sum(focus_generation:get_genomes(), v.genomes) / #focus_generation:get_genomes()
             else
                 new_genomes_num = (v.get_average_fitness() / (focus_generation:get_fitness_sum() / #focus_generation:get_genomes())) * config.population
+            end
             print("creating "..tonumber(new_genomes_num).." genome(s) for generation "..(focus_generation_key + 1).."..")
             if v.genomes[1].is_carried_over then
                 print("carrying over a genome from previous gen")
