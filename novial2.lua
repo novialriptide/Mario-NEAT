@@ -878,7 +878,7 @@ end
 
 function do_this_when_dead()
     x_progress = 0
-    -- local survival_num = #focus_generation.species * config.survival_threshold + 1
+    local survival_num = #focus_generation.species * config.survival_threshold + 1
     -- local survival_num = math.min(#focus_generation.species, 2)
     focus_genome.calculated_fitness = focus_genome:get_fitness()
     if focus_genome.calculated_fitness > highest_fitness_score then
@@ -916,20 +916,28 @@ function do_this_when_dead()
 
         focus_generation:sort_species()
         local average_fitness = focus_generation:get_fitness_sum() / #focus_generation.get_genomes()
-        for k1, v1 in pairs(focus_generation.species) do
-            for k2, v2 in pairs(v1.genomes) do
-                adaptive_mutate(v2, average_fitness)
+        if config.enable_adaptive_mutate then
+            for k1, v1 in pairs(focus_generation.species) do
+                for k2, v2 in pairs(v1.genomes) do
+                    adaptive_mutate(v2, average_fitness)
+                end
             end
         end
 
         local strong_species = {}
-        for k, v in pairs(focus_generation.species) do
-            if v.genomes[1].calculated_fitness == highest_fitness_score_generation then
-                table.insert(strong_species, v)
+        if config.strong_species_selector_mode == 0 then
+            for k, v in pairs(focus_generation.species) do
+                if v.genomes[1].calculated_fitness == highest_fitness_score_generation then
+                    table.insert(strong_species, v)
+                end
             end
         end
 
-        -- for g=1, survival_num do table.insert(strong_species, focus_generation.species[g]) end
+        if config.strong_species_selector_mode == 1 then
+            for g=1, survival_num do 
+                table.insert(strong_species, focus_generation.species[g])
+            end
+        end
 
         print(prefix.network..#strong_species.." species have survived to the next generation")
 
