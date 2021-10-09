@@ -231,7 +231,7 @@ function new_node(value, type, innov)
 end
 
 function new_connection(node1, node2, weight)
-    return {weight = weight, node_in = node1, node_out = node2, innov = 0, enabled = true, mutation_modifier = 1}
+    return {weight = weight, node_in = node1, node_out = node2, innov = 0, enabled = config.enabled_default, mutation_modifier = 1}
 end
 
 function new_genome()
@@ -697,10 +697,10 @@ function adaptive_mutate(genome, average_fitness)
     local percentage_increase = 0
     if genome.calculated_fitness >= average_fitness then
         if LOG_MUTATIONS then print("dec") end
-        percentage_increase = 0.95
+        percentage_increase = (1 - config.adaptive_mutate_rate)
     else
         if LOG_MUTATIONS then print("inc") end
-        percentage_increase = 1.05
+        percentage_increase = (1 + config.adaptive_mutate_rate)
     end
     
     local new_m_rates = {}
@@ -710,16 +710,26 @@ function adaptive_mutate(genome, average_fitness)
     genome.mutation_rates = new_m_rates
 end
 
+function adaptive_mutate(genome)
+    for k, v in pairs(genome.connections) do
+        if math.random() >= 0.5 then
+            v.mutation_modifier = v.mutation_modifier * (1 + config.adaptive_mutate_rate)
+        else
+            v.mutation_modifier = v.mutation_modifier * (1 - config.adaptive_mutate_rate)
+        end
+    end
+end
+
 function mutate(genome)
     local has_mutate_happen = false
     for k, v in pairs(genome.connections) do
-        if genome.mutation_rates.weight_mutate_rate > math.random() then
+        if genome.mutation_rates.weight_mutate_rate * v.mutation_modifier > math.random() then
             v.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
             if LOG_MUTATIONS then print("weight mutated ("..v.weight..")") end
             has_mutate_happen = true
         end
         
-        if config.enabled_default and genome.mutation_rates.enabled_mutate_rate > math.random() then
+        if genome.mutation_rates.enabled_mutate_rate * v.mutation_modifier > math.random() then
             if 0.5 > math.random() then
                 if LOG_MUTATIONS then print("connection enabled") end
                 v.enabled = true
@@ -916,10 +926,11 @@ function do_this_when_dead()
 
         focus_generation:sort_species()
         local average_fitness = focus_generation:get_fitness_sum() / #focus_generation.get_genomes()
-        if config.enable_adaptive_mutate then
+        if config.adaptive_mutate_mode ~= 0 then
             for k1, v1 in pairs(focus_generation.species) do
                 for k2, v2 in pairs(v1.genomes) do
-                    adaptive_mutate(v2, average_fitness)
+                    if config.adaptive_mutate_mode == 1 then adaptive_mutate(v2, average_fitness) end
+                    if config.adaptive_mutate_mode == 2 then adaptive_mutate(v2) end
                 end
             end
         end
