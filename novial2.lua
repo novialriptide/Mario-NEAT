@@ -13,11 +13,11 @@ box_size = 4
 x_offset = 20
 y_offset = 40
 
-color1 = 0xFF0000FF
-color2 = 0x400000FF
-color3 = 0xDD0000FF
-color4 = 0xAA0000FF
-color5 = {r = 22, g = 99, b = 32}
+color1 = {r = 255, g = 0, b = 0, a = 255}
+color2 = {r = 93, g = 6, b = 0, a = 255}
+color3 = {r = 190, g = 0, b = 0, a = 255}
+color4 = {r = 164, g = 0, b = 0, a = 255}
+color5 = {r = 22, g = 99, b = 32, a = 255}
 
 mario_x = 0
 mario_y = 0
@@ -28,7 +28,7 @@ mario_map_y = 0
 
 mario_x_screen_scroll = 0
 moving_objects = {}
-inputs_keys = {"A", "B", "right", "left", "up", "down"}
+inputs_keys = {"A", "B", "right", "left"}
 
 prefix = {error = "[Error]: ", warning = "[Warning]: ", network = "[Network]: "}
 
@@ -130,7 +130,7 @@ function draw_buttons()
         if _inputs[v] then
             gui.drawtext(210, y_offset + (k-1)*10, v, color1, color2)
         else
-            gui.drawtext(210, y_offset + (k-1)*10, v, color2, color2)
+            gui.drawtext(210, y_offset + (k-1)*10, v, color3, color2)
         end
     end
 end
@@ -693,7 +693,7 @@ function get_connection_innovs(connections)
     return innovs
 end
 
-function adaptive_mutate(genome, average_fitness)
+function adaptive_mutate1(genome, average_fitness)
     local percentage_increase = 0
     if genome.calculated_fitness >= average_fitness then
         if LOG_MUTATIONS then print("dec") end
@@ -710,7 +710,7 @@ function adaptive_mutate(genome, average_fitness)
     genome.mutation_rates = new_m_rates
 end
 
-function adaptive_mutate(genome)
+function adaptive_mutate2(genome)
     for k, v in pairs(genome.connections) do
         if math.random() >= 0.5 then
             v.mutation_modifier = v.mutation_modifier * (1 + config.adaptive_mutate_rate)
@@ -718,6 +718,18 @@ function adaptive_mutate(genome)
             v.mutation_modifier = v.mutation_modifier * (1 - config.adaptive_mutate_rate)
         end
     end
+end
+
+function adaptive_mutate3(genome)
+    local new_m_rates = {}
+    for k, v in pairs(genome.mutation_rates) do
+        if math.random() >= 0.5 then
+            new_m_rates[k] = v * (1 + config.adaptive_mutate_rate)
+        else
+            new_m_rates[k] = v * (1 - config.adaptive_mutate_rate)
+        end
+    end
+    genome.mutation_rates = new_m_rates
 end
 
 function mutate(genome)
@@ -773,8 +785,8 @@ function mutate(genome)
     if genome.mutation_rates.conn_add_prob > math.random() then
         if LOG_MUTATIONS then print("connection added") end
         -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
-        if #genome:get_nodes() > config.num_inputs+6 and 0.5 > math.random(0, 1) then
-            has_mutate_happen = genome:add_connection(math.random(config.num_inputs+1, #genome:get_nodes()), math.random(config.num_inputs+6+1, #genome:get_nodes()))
+        if #genome:get_nodes() > config.num_inputs+#inputs_keys and 0.5 > math.random(0, 1) then
+            has_mutate_happen = genome:add_connection(math.random(config.num_inputs+1, #genome:get_nodes()), math.random(config.num_inputs+#inputs_keys+1, #genome:get_nodes()))
         else
             has_mutate_happen = genome:add_connection(math.random(1, #genome:get_nodes()), math.random(config.num_inputs+1, #genome:get_nodes()))
         end
@@ -863,7 +875,7 @@ function write_data(file_name, data)
                     local enabled_str = "true"
                     if v3.enabled then enabled_str = "true" end
                     if not v3.enabled then enabled_str = "false" end
-                    compiled_data = compiled_data.."\n - [conn] innov: "..v3.innov..", weight: "..v3.weight..", node_in: "..v3.node_in..", node_out: "..v3.node_out..", enabled: "..enabled_str
+                    compiled_data = compiled_data.."\n - [conn] innov: "..v3.innov..", weight: "..v3.weight..", node_in: "..v3.node_in..", node_out: "..v3.node_out..", enabled: "..enabled_str..", mod: "..v3.mutation_modifier
                 end
 
                 for k3, v3 in pairs(v2.mutation_rates) do
@@ -929,8 +941,9 @@ function do_this_when_dead()
         if config.adaptive_mutate_mode ~= 0 then
             for k1, v1 in pairs(focus_generation.species) do
                 for k2, v2 in pairs(v1.genomes) do
-                    if config.adaptive_mutate_mode == 1 then adaptive_mutate(v2, average_fitness) end
-                    if config.adaptive_mutate_mode == 2 then adaptive_mutate(v2) end
+                    if config.adaptive_mutate_mode == 1 then adaptive_mutate1(v2, average_fitness) end
+                    if config.adaptive_mutate_mode == 2 then adaptive_mutate2(v2) end
+                    if config.adaptive_mutate_mode == 3 then adaptive_mutate3(v2) end
                 end
             end
         end
@@ -938,7 +951,7 @@ function do_this_when_dead()
         local strong_species = {}
         if config.strong_species_selector_mode == 0 then
             for k, v in pairs(focus_generation.species) do
-                if v.genomes[1].calculated_fitness == highest_fitness_score_generation then
+                if v.genomes[1].calculated_fitness >= highest_fitness_score_generation - config.margin_error_value then
                     table.insert(strong_species, v)
                 end
             end

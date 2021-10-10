@@ -27,14 +27,15 @@ config = {
     adaptive_mutate_rate            = 0.05,
 
     -- [DefaultSpeciesSet]
-    compatibility_threshold         = 1.0,
+    compatibility_threshold         = 3.0,
 
     -- [DefaultReproduction]
     survival_threshold              = 0.1,
     use_adjusted_fitness            = true,
     crossover_rate                  = 0.70,
-    strong_species_selector_mode    = 1,
-    adaptive_mutate_mode            = 2
+    strong_species_selector_mode    = 0,
+    margin_error_value              = 10,
+    adaptive_mutate_mode            = 3
 }
 
 return config
