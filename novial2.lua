@@ -12,6 +12,8 @@ LOG_MUTATIONS = false
 box_size = 4
 x_offset = 20
 y_offset = 40
+x_bias = 80
+y_bias = 100
 
 color1 = {r = 255, g = 0, b = 0, a = 255}
 color2 = {r = 93, g = 6, b = 0, a = 255}
@@ -299,12 +301,16 @@ function new_genome()
         return {c1, c2}
     end
 
-    function genome:add_connection(node1, node2)
+    function genome:add_connection(node1, node2, weight)
         if genome:get_node(node2).type == "BIAS" or genome:get_node(node2).type == "INPUT" then
             return false
         end
 
         local connect_node = new_connection(node1, node2, math.random(config.weight_min_value, config.weight_max_value) + math.random())
+        if weight ~= nil then
+            connect_node.weight = weight
+        end
+
         -- must add a try except thing to cover nodes that dont exist
         if genome:does_node_exist(node1) and genome:does_node_exist(node2) then
             for k, v in pairs(global_connections) do
@@ -346,7 +352,7 @@ function new_genome()
         table.insert(genome.hidden_nodes, new_node(0, "HIDDEN"))
         local rand_conn_key = math.random(1, #genome.connections)
         local rand_conn = genome.connections[rand_conn_key]
-        local node_innov = #inputs_keys + config.num_inputs + #genome.hidden_nodes
+        local node_innov = #inputs_keys + config.num_inputs + #genome.hidden_nodes + 1
         local new_connections = genome:split_connection(rand_conn, node_innov)
         table.remove(genome.connections, rand_conn_key)
         for k, v in pairs(new_connections) do
@@ -439,7 +445,7 @@ function new_genome()
     end
 
     function genome:draw_nodes()
-        for k, v in pairs(genome:get_nodes()) do
+        for k, v in pairs(genome.hidden_nodes) do
             if v.type == "BIAS" or v.type == "HIDDEN" then
                 draw_world_tile(v.x, v.y, color1, color2)
             end
@@ -760,20 +766,6 @@ function mutate(genome)
         end
     end
 
-    if genome.mutation_rates.bias_add_prob > math.random() then
-        if LOG_MUTATIONS then print("bias added") end
-        genome:add_bias(math.random(config.num_inputs + 1, #genome:get_nodes()))
-        has_mutate_happen = true
-    end
-
-    if genome.mutation_rates.node_add_prob > math.random() then
-        if #genome.connections ~= 0 then
-            if LOG_MUTATIONS then print("node added") end
-            genome:add_node()
-            has_mutate_happen = true
-        end
-    end
-
     if genome.mutation_rates.conn_delete_prob > math.random() and #genome.connections > 0 then
         if #genome.hidden_nodes > 0 and #genome.connections > 1 then
             if LOG_MUTATIONS then print("connection deleted") end
@@ -790,6 +782,20 @@ function mutate(genome)
         else
             has_mutate_happen = genome:add_connection(math.random(1, #genome:get_nodes()), math.random(config.num_inputs+1, #genome:get_nodes()))
         end
+    end
+
+    if genome.mutation_rates.node_add_prob > math.random() then
+        if #genome.connections ~= 0 then
+            if LOG_MUTATIONS then print("node added") end
+            genome:add_node()
+            has_mutate_happen = true
+        end
+    end
+
+    if genome.mutation_rates.bias_add_prob > math.random() then
+        if LOG_MUTATIONS then print("bias added") end
+        genome:add_bias(math.random(config.num_inputs + 1, #genome:get_nodes()))
+        has_mutate_happen = true
     end
 
     if not has_mutate_happen then
@@ -849,15 +855,15 @@ highest_fitness_score_generation = 0
 focus_generation = new_inital_generation(config.population)
 focus_generation:mutate_genomes()
 
--- focus_generation.species[1].genomes[1]:add_connection(config.num_inputs, config.num_inputs+3)
-
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
--- focus_genome.connections = {}
--- focus_genome:add_bias(config.num_inputs + #inputs_keys - 3)
--- focus_genome:add_connection(math.random(config.num_inputs+1, #focus_genome:get_nodes()), math.random(config.num_inputs+1, config.num_inputs+6))
--- focus_genome:add_connection(math.random(config.num_inputs+1, #focus_genome:get_nodes()), math.random(config.num_inputs+6+1, #focus_genome:get_nodes()))
--- focus_genome:remove_connection(focus_genome.connections[1].innov)
+--[[
+focus_genome.connections = {}
+focus_genome:add_connection(197, 222, -10)
+focus_genome:add_node()
+focus_genome:add_connection(226, 224, 10)
+focus_genome:add_connection(179, 222, 10)]
+]]--
 
 function write_data(file_name, data)
     local function compile_data(data)
@@ -886,9 +892,13 @@ function write_data(file_name, data)
 
         return compiled_data
     end
-    file = io.open("saves/"..file_name..".txt", "w")
-    file:write(compile_data(data))
-    file:close()
+    local file, err = io.open("saves/"..file_name..".txt", "w")
+    if file == nil then
+        print(prefix.error.."Could not open file [".. err.."]")
+    else
+        file:write(compile_data(data))
+        file:close()
+    end
 end
 
 function print_data()
@@ -911,11 +921,6 @@ function do_this_when_dead()
     if focus_genome.calculated_fitness > highest_fitness_score_generation then
         highest_fitness_score_generation = focus_genome.calculated_fitness
         print(prefix.network.."Highest Fitness Gen : "..highest_fitness_score_generation)
-    end
-    if focus_genome.calculated_fitness >= config.fitness_threshold then
-        write_data("gen"..focus_generation_key, focus_generation)
-        print(prefix.network.."ya boi reached it..")
-        return
     end
     emu.poweron()
     if focus_species_key == #focus_generation.species then
@@ -1036,7 +1041,14 @@ function test_next_gen()
         joypad.set(1, {start = false})
         x_progress = 0
     end
-    
+
+    if memory.readbyte(0x0770) == 1 and focus_genome:get_fitness() >= config.fitness_threshold then -- this was implemented after the simulation started
+        write_data("gen"..focus_generation_key, focus_generation)
+        print(prefix.network.."ya boi reached it..")
+        print(focus_genome)
+        return
+    end
+
     -- new gen
     if is_dead() then
         do_this_when_dead()

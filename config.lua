@@ -8,7 +8,7 @@
 --  [NEAT]
 
 config = {
-    fitness_threshold               = 3000, -- found solution
+    fitness_threshold               = 3500, -- found solution
     population                      = 300, -- 300,
     reset_on_extinction             = 0,
 
