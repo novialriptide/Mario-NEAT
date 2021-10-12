@@ -28,11 +28,24 @@ x_progress = 0
 mario_map_x = 0
 mario_map_y = 0
 
-mario_x_screen_scroll = 0
 moving_objects = {}
 inputs_keys = {"A", "B", "right", "left"}
+inputs = {}
+is_nudged = false
+is_timer_set = false
+start_timeout = 0
 
 prefix = {error = "[Error]: ", warning = "[Warning]: ", network = "[Network]: "}
+
+function clear_joypad()
+    inputs = {}
+    is_nudged = false
+    for k, v in pairs(inputs_keys) do
+        inputs[inputs_keys[k]] = false
+    end
+
+    joypad.set(1, inputs)
+end
 
 function sigmoid(x)
     return 1 / (1 + math.pow(2.71828, -x))
@@ -45,7 +58,6 @@ end
 function get_positions()
     mario_x = memory.readbyte(0x0086) + memory.readbyte(0x006D) * 256
     mario_y = memory.readbyte(0x03B8)
-    mario_x_screen_scroll = memory.readbyte(0x071D)
 end
 
 function get_tile(_x, _y)
@@ -412,11 +424,8 @@ function new_genome()
             end
         end
         
-        local inputs = {}
         for k, v in pairs(output_nodes) do
-            if v.value > 0.9 then
-                inputs[inputs_keys[k]] = true
-            end
+            inputs[inputs_keys[k]] = v.value > 0.9
         end
         joypad.set(1, inputs)
 
@@ -854,15 +863,17 @@ highest_fitness_score_generation = 0
 
 focus_generation = new_inital_generation(config.population)
 focus_generation:mutate_genomes()
-
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
+
 --[[
 focus_genome.connections = {}
-focus_genome:add_connection(197, 222, -10)
+focus_genome:add_connection(196, 222, -10)
 focus_genome:add_node()
 focus_genome:add_connection(226, 224, 10)
-focus_genome:add_connection(179, 222, 10)]
+focus_genome:add_connection(161, 222, 10)
+--focus_genome:add_connection(135, 222, 10)
+focus_genome:add_connection(179, 222, 10)
 ]]--
 
 function write_data(file_name, data)
@@ -910,6 +921,7 @@ end
 
 function do_this_when_dead()
     x_progress = 0
+    clear_joypad()
     local survival_num = #focus_generation.species * config.survival_threshold + 1
     -- local survival_num = math.min(#focus_generation.species, 2)
     focus_genome.calculated_fitness = focus_genome:get_fitness()
@@ -1040,6 +1052,7 @@ function test_next_gen()
         emu.frameadvance()
         joypad.set(1, {start = false})
         x_progress = 0
+        clear_joypad()
     end
 
     if memory.readbyte(0x0770) == 1 and focus_genome:get_fitness() >= config.fitness_threshold then -- this was implemented after the simulation started
@@ -1063,9 +1076,6 @@ function draw_info(generation, species, genome, fitness)
         gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16+8*i, text[i+1], color1, color2)
     end
 end
-
-is_timer_set = false
-start_timeout = 0
 
 function is_moving()
     return 0 ~= memory.readbyte(0x0057)
@@ -1092,10 +1102,10 @@ while (true) do
     ai_inputs = get_map()
     read_enemies(ai_inputs)
     draw_map(ai_inputs)
-
     focus_genome:draw_connections()
     focus_genome:draw_nodes()
     focus_genome:eval()
+    joypad.set(1, inputs)
     draw_buttons()
     draw_info(focus_generation_key, focus_species_key, focus_genome_key, focus_genome:get_fitness())
 
@@ -1105,9 +1115,17 @@ while (true) do
     end
     if is_moving2() then
         is_timer_set = false
+        is_nudged = false
     end
+    if get_game_timer() == start_timeout - 4 and is_timer_set and not is_nudged then
+        clear_joypad()
+        print(prefix.network.."It seems Mario is stuck, let's give him a nudge")
+        is_nudged = true
+    end
+
     if get_game_timer() <= start_timeout - 8 and is_timer_set then
         is_timer_set = false
+        is_nudged = false
         do_this_when_dead()
     end
 
