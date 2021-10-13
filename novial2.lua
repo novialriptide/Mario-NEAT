@@ -259,7 +259,8 @@ function new_genome()
             node_add_prob = config.node_add_prob,
             node_delete_prob = config.node_delete_prob,
             enabled_mutate_rate = config.enabled_mutate_rate,
-            weight_mutate_rate = config.weight_mutate_rate
+            weight_mutate_rate = config.weight_mutate_rate,
+            weight_add_value = config.weight_add_value
         }
     }
     
@@ -427,6 +428,17 @@ function new_genome()
         for k, v in pairs(output_nodes) do
             inputs[inputs_keys[k]] = v.value > 0.9
         end
+
+        if inputs["up"] and inputs["down"] then
+            inputs["up"] = false
+            inputs["down"] = false
+        end
+        
+        if inputs["left"] and inputs["right"] then
+            inputs["left"] = false
+            inputs["right"] = false
+        end
+
         joypad.set(1, inputs)
 
         return inputs
@@ -751,7 +763,11 @@ function mutate(genome)
     local has_mutate_happen = false
     for k, v in pairs(genome.connections) do
         if genome.mutation_rates.weight_mutate_rate * v.mutation_modifier > math.random() then
-            v.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
+            if config.weight_add_rate > math.random() then
+                v.weight = v.weight + math.random() * genome.mutation_rates.weight_add_value
+            else
+                v.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
+            end
             if LOG_MUTATIONS then print("weight mutated ("..v.weight..")") end
             has_mutate_happen = true
         end
@@ -912,19 +928,20 @@ function write_data(file_name, data)
     end
 end
 
-function print_data()
-    print("")
-    print(prefix.network.."Total Pop           : "..focus_generation:get_population_size())
-    print(prefix.network.."Total Species       : "..#focus_generation.species)
-    print(prefix.network.."Total Species Pop   : "..#focus_species.genomes)
-end
-
 function do_this_when_dead()
     x_progress = 0
     clear_joypad()
     local survival_num = #focus_generation.species * config.survival_threshold + 1
+    local strong_species_selector_mode = config.strong_species_selector_mode
     -- local survival_num = math.min(#focus_generation.species, 2)
     focus_genome.calculated_fitness = focus_genome:get_fitness()
+
+    if focus_species_key == #focus_generation.species then
+        if highest_fitness_score >= highest_fitness_score_generation then
+            num_no_changes = num_no_changes + 1
+        end
+    end
+
     if focus_genome.calculated_fitness > highest_fitness_score then
         highest_fitness_score = focus_genome.calculated_fitness
         highest_fitness_genome = copy_genome(focus_genome)
@@ -936,13 +953,9 @@ function do_this_when_dead()
     end
     emu.poweron()
     if focus_species_key == #focus_generation.species then
-        if highest_fitness_score > highest_fitness_score_generation then
-            num_no_changes = num_no_changes + 1
-        end
-        
-        if num_no_changes > 10 then
-            print(prefix.warning.."Fitness score is not making improvements. Breeding only 2 species")
-            survival_num = 2
+        if num_no_changes > 10 and strong_species_selector_mode ~= 0 then
+            print(prefix.warning.."Fitness score is not making improvements. Changing strong_species_selector_mode to 0")
+            strong_species_selector_mode = 0
             num_no_changes = 0
         end
 
@@ -966,7 +979,7 @@ function do_this_when_dead()
         end
 
         local strong_species = {}
-        if config.strong_species_selector_mode == 0 then
+        if strong_species_selector_mode == 0 then
             for k, v in pairs(focus_generation.species) do
                 if v.genomes[1].calculated_fitness >= highest_fitness_score_generation - config.margin_error_value then
                     table.insert(strong_species, v)
@@ -974,7 +987,7 @@ function do_this_when_dead()
             end
         end
 
-        if config.strong_species_selector_mode == 1 then
+        if strong_species_selector_mode == 1 then
             for g=1, survival_num do 
                 table.insert(strong_species, focus_generation.species[g])
             end
@@ -1024,7 +1037,6 @@ function do_this_when_dead()
         end
 
         print(prefix.network.."Carried over "..carried_over_num.." species")
-
         new_gen:find_all_species()
         focus_generation_key = focus_generation_key + 1
         focus_generation = new_gen
@@ -1041,7 +1053,6 @@ function do_this_when_dead()
         print(prefix.error.."Extinction")
     end
 
-    -- print_data()
     focus_species = focus_generation.species[focus_species_key]
     focus_genome = focus_species.genomes[focus_genome_key]
 end
@@ -1063,15 +1074,11 @@ function test_next_gen()
     end
 
     -- new gen
-    if is_dead() then
-        do_this_when_dead()
-    end
+    if is_dead() then do_this_when_dead() end
 end
 
 function draw_info(generation, species, genome, fitness)
-    local text = {
-        "gen: "..generation, "species: "..species, "genome: "..genome, "fitness: "..fitness
-    }
+    local text = {"gen: "..generation, "species: "..species, "genome: "..genome, "fitness: "..fitness}
     for i=0, #text-1 do
         gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16+8*i, text[i+1], color1, color2)
     end
@@ -1119,7 +1126,6 @@ while (true) do
     end
     if get_game_timer() == start_timeout - 4 and is_timer_set and not is_nudged then
         clear_joypad()
-        print(prefix.network.."It seems Mario is stuck, let's give him a nudge")
         is_nudged = true
     end
 

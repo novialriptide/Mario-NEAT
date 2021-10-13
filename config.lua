@@ -18,22 +18,24 @@ config = {
     conn_delete_prob                = 0.75,
     weight_max_value                = 30,
     weight_min_value                = -30,
+    weight_add_value                = 5,
+    weight_add_rate                 = 0.3,
     weight_mutate_rate              = 0.8,
     enabled_default                 = true,
     enabled_mutate_rate             = 0.2,
-    node_add_prob                   = 0.25,
-    node_delete_prob                = 0.25,
-    bias_add_prob                   = 0.10,
+    node_add_prob                   = 0.50,
+    node_delete_prob                = 0.50,
+    bias_add_prob                   = 0.30,
     adaptive_mutate_rate            = 0.05,
 
     -- [DefaultSpeciesSet]
     compatibility_threshold         = 3.0,
 
     -- [DefaultReproduction]
-    survival_threshold              = 0.1,
+    survival_threshold              = 0.15,
     use_adjusted_fitness            = true,
     crossover_rate                  = 0.70,
-    strong_species_selector_mode    = 0,
+    strong_species_selector_mode    = 1,
     margin_error_value              = 10,
     adaptive_mutate_mode            = 3
 }
