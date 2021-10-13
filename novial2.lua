@@ -975,6 +975,7 @@ function do_this_when_dead()
     end
     emu.poweron()
     if focus_species_key == #focus_generation.species then
+        print("The average fitness score for generation "..focus_generation_key.." is "..focus_generation:get_fitness_sum() / #focus_generation:get_genomes())
         if num_no_changes > config.emergency_reproduce and strong_species_selector_mode ~= 0 then
             print(prefix.warning.."Changing strong_species_selector_mode to 0")
             strong_species_selector_mode = 0
