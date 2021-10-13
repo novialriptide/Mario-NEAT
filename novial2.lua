@@ -479,6 +479,16 @@ function new_genome()
         return score
     end
 
+    function genome:reset_mutation_rates()
+        local new_m_rates = {}
+        for k, v in pairs(genome.mutation_rates) do
+            new_m_rates[k] = config[k]
+        end
+        genome.mutation_rates = new_m_rates
+        
+        return g
+    end
+
     return genome
 end
 
@@ -569,6 +579,12 @@ function new_species()
         table.sort(species.genomes, compare)
     end
 
+    function species:reset_mutation_rates()
+        for k, v in pairs(species.genomes) do
+            v:reset_mutation_rates()
+        end
+    end
+
     return species
 end
 
@@ -657,6 +673,12 @@ function new_generation()
         end
 
         table.sort(generation.species, compare)
+    end
+
+    function generation:reset_mutation_rates()
+        for k, v in pairs(generation.species) do
+            v:reset_mutation_rates()
+        end
     end
 
     return generation
@@ -886,12 +908,12 @@ focus_genome = focus_species.genomes[focus_genome_key]
 focus_genome.connections = {}
 focus_genome:add_connection(196, 222, -10)
 focus_genome:add_node()
+focus_genome.connections[1].weight = -10
+focus_genome.connections[2].weight = 5
 focus_genome:add_connection(226, 224, 10)
 focus_genome:add_connection(161, 222, 10)
---focus_genome:add_connection(135, 222, 10)
 focus_genome:add_connection(179, 222, 10)
 ]]--
-
 function write_data(file_name, data)
     local function compile_data(data)
         local compiled_data = ""
@@ -953,9 +975,14 @@ function do_this_when_dead()
     end
     emu.poweron()
     if focus_species_key == #focus_generation.species then
-        if num_no_changes > 10 and strong_species_selector_mode ~= 0 then
-            print(prefix.warning.."Fitness score is not making improvements. Changing strong_species_selector_mode to 0")
+        if num_no_changes > config.emergency_reproduce and strong_species_selector_mode ~= 0 then
+            print(prefix.warning.."Changing strong_species_selector_mode to 0")
             strong_species_selector_mode = 0
+        end
+
+        if num_no_changes > config.on_reset_generations then
+            print(prefix.warning.."It looks like we reached a local minima... Resetting every genome's mutation rates")
+            focus_generation:reset_mutation_rates()
             num_no_changes = 0
         end
 

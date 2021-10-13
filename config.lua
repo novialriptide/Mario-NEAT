@@ -37,7 +37,9 @@ config = {
     crossover_rate                  = 0.70,
     strong_species_selector_mode    = 1,
     margin_error_value              = 10,
-    adaptive_mutate_mode            = 3
+    adaptive_mutate_mode            = 3,
+    emergency_reproduce             = 20, -- how many generations will it take to reproduce 2 species
+    on_reset_generations            = 25  -- how many generations will it take to reset all generation mutations
 }
 
 return config
