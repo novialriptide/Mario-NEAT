@@ -9,7 +9,7 @@
 
 config = {
     fitness_threshold               = 3500, -- found solution
-    population                      = 300, -- 300,
+    population                      = 300,
     reset_on_extinction             = 0,
 
     -- [DefaultGenome]
@@ -39,7 +39,7 @@ config = {
     margin_error_value              = 10,
     adaptive_mutate_mode            = 3,
     emergency_reproduce             = 20, -- how many generations will it take to reproduce 2 species
-    on_reset_generations            = 25  -- how many generations will it take to reset all generation mutations
+    on_reset_generations            = 25, -- how many generations will it take to reset all generation mutations
 }
 
 return config

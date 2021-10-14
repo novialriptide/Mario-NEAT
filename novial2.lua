@@ -439,8 +439,6 @@ function new_genome()
             inputs["right"] = false
         end
 
-        joypad.set(1, inputs)
-
         return inputs
     end
 
@@ -975,7 +973,7 @@ function do_this_when_dead()
     end
     emu.poweron()
     if focus_species_key == #focus_generation.species then
-        print("The average fitness score for generation "..focus_generation_key.." is "..focus_generation:get_fitness_sum() / #focus_generation:get_genomes())
+        print(prefix.network.."The average fitness score for generation "..focus_generation_key.." is "..focus_generation:get_fitness_sum() / #focus_generation:get_genomes())
         if num_no_changes > config.emergency_reproduce and strong_species_selector_mode ~= 0 then
             print(prefix.warning.."Changing strong_species_selector_mode to 0")
             strong_species_selector_mode = 0
@@ -1031,6 +1029,7 @@ function do_this_when_dead()
             return a.calculated_fitness > b.calculated_fitness
         end
 
+        local new_genomes_created = 0
         table.sort(strong_species, compare1)
         local new_gen = new_generation()
         local carried_over_num = 0
@@ -1042,7 +1041,7 @@ function do_this_when_dead()
             else
                 new_genomes_num = (v.get_average_fitness() / (focus_generation:get_fitness_sum() / #focus_generation:get_genomes())) * config.population
             end
-            print(prefix.network.."Creating "..tonumber(new_genomes_num).." genome(s) for generation "..(focus_generation_key + 1).."..")
+            new_genomes_created = new_genomes_created + new_genomes_num
             if v.genomes[1].is_carried_over then
                 carried_over_num = carried_over_num + 1
             end
@@ -1060,10 +1059,10 @@ function do_this_when_dead()
                 mutate(g)
                 table.insert(new_gen.unspecified_genomes, g)
             end
-            print(prefix.network.."Success!")
             table.insert(new_gen.species, new_spec)
         end
 
+        print(prefix.network.."Created"..new_genomes_created.." genomes")
         print(prefix.network.."Carried over "..carried_over_num.." species")
         new_gen:find_all_species()
         focus_generation_key = focus_generation_key + 1
