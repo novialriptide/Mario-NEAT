@@ -4,11 +4,8 @@
 --              https://www.mdpi.com/2078-2489/10/12/390/pdf
 
 config = require("config")
-
 math.randomseed(os.time())
-math.random(); math.random(); math.random() -- agony agony agony agony agony agony agony
 
-LOG_MUTATIONS = false
 box_size = 4
 x_offset = 20
 y_offset = 40
@@ -34,6 +31,9 @@ inputs = {}
 is_nudged = false
 is_timer_set = false
 start_timeout = 0
+
+crossover_rate = config.crossover_rate
+enabled_crossover_rate_modifier = false
 
 prefix = {error = "[Error]: ", warning = "[Warning]: ", network = "[Network]: "}
 
@@ -258,8 +258,8 @@ function new_genome()
             conn_delete_prob = config.conn_delete_prob,
             node_add_prob = config.node_add_prob,
             node_delete_prob = config.node_delete_prob,
-            enabled_mutate_rate = config.enabled_mutate_rate,
-            weight_mutate_rate = config.weight_mutate_rate,
+            enabled_mutate_prob = config.enabled_mutate_prob,
+            weight_mutate_prob = config.weight_mutate_prob,
             weight_add_value = config.weight_add_value
         }
     }
@@ -692,6 +692,7 @@ function copy_generation(generation)
 end
 
 function new_inital_generation(population_size)
+    print(prefix.network.."Ready, Set, Go! - Algorithm by Novial")
     local generation = new_generation()
 
     for i=1, population_size do
@@ -743,10 +744,8 @@ end
 function adaptive_mutate1(genome, average_fitness)
     local percentage_increase = 0
     if genome.calculated_fitness >= average_fitness then
-        if LOG_MUTATIONS then print("dec") end
         percentage_increase = (1 - config.adaptive_mutate_rate)
     else
-        if LOG_MUTATIONS then print("inc") end
         percentage_increase = (1 + config.adaptive_mutate_rate)
     end
     
@@ -779,73 +778,81 @@ function adaptive_mutate3(genome)
     genome.mutation_rates = new_m_rates
 end
 
-function mutate(genome)
-    local has_mutate_happen = false
-    for k, v in pairs(genome.connections) do
-        if genome.mutation_rates.weight_mutate_rate * v.mutation_modifier > math.random() then
-            if config.weight_add_rate > math.random() then
-                v.weight = v.weight + math.random() * genome.mutation_rates.weight_add_value
-            else
-                v.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
+function adaptive_mutate()
+    if config.adaptive_mutate_mode ~= 0 then
+        for k1, v1 in pairs(focus_generation.species) do
+            for k2, v2 in pairs(v1.genomes) do
+                if config.adaptive_mutate_mode == 1 then adaptive_mutate1(v2, average_fitness) end
+                if config.adaptive_mutate_mode == 2 then adaptive_mutate2(v2) end
+                if config.adaptive_mutate_mode == 3 then adaptive_mutate3(v2) end
             end
-            if LOG_MUTATIONS then print("weight mutated ("..v.weight..")") end
-            has_mutate_happen = true
+        end
+    end
+end
+
+function mutate_weight_conn(genome, conn)
+    if config.weight_add_prob > math.random() then
+        conn.weight = conn.weight + math.random() * genome.mutation_rates.weight_add_value
+    else
+        conn.weight = math.random(config.weight_min_value, config.weight_max_value) + math.random()
+    end
+end
+
+function mutate_node_delete(genome)
+    if #genome.hidden_nodes > 1 and #genome.connections > 0 then
+        genome:delete_node(math.random(1, #genome:get_nodes()))
+    end
+end
+
+function mutate_conn_delete(genome)
+    if #genome.hidden_nodes > 0 and #genome.connections > 1 then
+        genome:remove_connection(math.random(1, #genome.connections))
+    end
+end
+
+function mutate_conn_add(genome)
+    -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
+    local success = false
+    if #genome:get_nodes() > config.num_inputs+#inputs_keys and 0.5 > math.random() then
+        success = genome:add_connection(math.random(config.num_inputs+1, #genome:get_nodes()), math.random(config.num_inputs+#inputs_keys+1, #genome:get_nodes()))
+    else
+        success = genome:add_connection(math.random(1, #genome:get_nodes()), math.random(config.num_inputs+1, #genome:get_nodes()))
+    end
+
+    if success == false then mutate_conn_add(genome) end
+end
+
+function mutate_node_add(genome)
+    if #genome.connections ~= 0 then
+        genome:add_node()
+    end
+end
+
+function mutate_bias_add(genome)
+    genome:add_bias(math.random(config.num_inputs + 1, #genome:get_nodes()))
+end
+
+function mutate(genome)
+    for k, v in pairs(genome.connections) do
+        if genome.mutation_rates.weight_mutate_prob * v.mutation_modifier > math.random() then
+            mutate_weight_conn(genome, v)
         end
         
-        if genome.mutation_rates.enabled_mutate_rate * v.mutation_modifier > math.random() then
-            if 0.5 > math.random() then
-                if LOG_MUTATIONS then print("connection enabled") end
-                v.enabled = true
-            else
-                if LOG_MUTATIONS then print("connection disabled") end
-                v.enabled = false
-            end
-            has_mutate_happen = true
+        if genome.mutation_rates.enabled_mutate_prob * v.mutation_modifier > math.random() then
+            v.enabled = 0.5 > math.random()
         end
     end
 
-    if genome.mutation_rates.node_delete_prob > math.random() then
-        if #genome.hidden_nodes > 1 and #genome.connections > 0 then
-            if LOG_MUTATIONS then print("node deleted") end
-            has_mutate_happen = genome:delete_node(math.random(1, #genome:get_nodes()))
-        end
+    local function mutate_type(prob, func)
+        for i=1, math.floor(prob) do func(genome) end
+        if prob - math.floor(prob) > math.random() then func(genome) end
     end
 
-    if genome.mutation_rates.conn_delete_prob > math.random() and #genome.connections > 0 then
-        if #genome.hidden_nodes > 0 and #genome.connections > 1 then
-            if LOG_MUTATIONS then print("connection deleted") end
-            genome:remove_connection(math.random(1, #genome.connections))
-            has_mutate_happen = true
-        end
-    end
-
-    if genome.mutation_rates.conn_add_prob > math.random() then
-        if LOG_MUTATIONS then print("connection added") end
-        -- to make it even for the input and hidden nodes to become connected, there will be a 1/2 chance for the type of nodes to be added
-        if #genome:get_nodes() > config.num_inputs+#inputs_keys and 0.5 > math.random(0, 1) then
-            has_mutate_happen = genome:add_connection(math.random(config.num_inputs+1, #genome:get_nodes()), math.random(config.num_inputs+#inputs_keys+1, #genome:get_nodes()))
-        else
-            has_mutate_happen = genome:add_connection(math.random(1, #genome:get_nodes()), math.random(config.num_inputs+1, #genome:get_nodes()))
-        end
-    end
-
-    if genome.mutation_rates.node_add_prob > math.random() then
-        if #genome.connections ~= 0 then
-            if LOG_MUTATIONS then print("node added") end
-            genome:add_node()
-            has_mutate_happen = true
-        end
-    end
-
-    if genome.mutation_rates.bias_add_prob > math.random() then
-        if LOG_MUTATIONS then print("bias added") end
-        genome:add_bias(math.random(config.num_inputs + 1, #genome:get_nodes()))
-        has_mutate_happen = true
-    end
-
-    if not has_mutate_happen then
-        mutate(genome)
-    end
+    mutate_type(genome.mutation_rates.node_delete_prob, mutate_node_delete)
+    mutate_type(genome.mutation_rates.conn_delete_prob, mutate_conn_delete)
+    mutate_type(genome.mutation_rates.node_add_prob, mutate_node_add)
+    mutate_type(genome.mutation_rates.bias_add_prob, mutate_bias_add)
+    mutate_type(genome.mutation_rates.conn_add_prob, mutate_conn_add)
 end
 
 function crossover(genome1, genome2)
@@ -898,6 +905,7 @@ highest_fitness_genome = 0
 highest_fitness_score_generation = 0
 
 focus_generation = new_inital_generation(config.population)
+adaptive_mutate()
 focus_generation:mutate_genomes()
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = focus_species.genomes[focus_genome_key]
@@ -914,7 +922,7 @@ focus_genome:add_connection(179, 222, 10)
 ]]--
 function write_data(file_name, data)
     local function compile_data(data)
-        local compiled_data = ""
+        local compiled_data = "crossover rate: "..crossover_rate..""
         for k1, v1 in pairs(data.species) do
             for k2, v2 in pairs(v1.genomes) do
                 compiled_data = compiled_data.."\n species: "..k1..", genome: "..k2.. ", fitness score: "..v2.calculated_fitness
@@ -959,6 +967,8 @@ function do_this_when_dead()
     if focus_species_key == #focus_generation.species then
         if highest_fitness_score >= highest_fitness_score_generation then
             num_no_changes = num_no_changes + 1
+        else
+            num_no_changes = 0
         end
     end
 
@@ -974,15 +984,17 @@ function do_this_when_dead()
     emu.poweron()
     if focus_species_key == #focus_generation.species then
         print(prefix.network.."The average fitness score for generation "..focus_generation_key.." is "..focus_generation:get_fitness_sum() / #focus_generation:get_genomes())
-        if num_no_changes > config.emergency_reproduce and strong_species_selector_mode ~= 0 then
+        if num_no_changes > config.emergency_reproduce and strong_species_selector_mode ~= 0 and config.enable_emergency_reproduce then
             print(prefix.warning.."Changing strong_species_selector_mode to 0")
             strong_species_selector_mode = 0
         end
 
         if num_no_changes > config.on_reset_generations then
-            print(prefix.warning.."It looks like we reached a local minima... Resetting every genome's mutation rates")
+            print(prefix.warning.."It looks like we reached a local minima... Resetting every genome's mutation rates and widening search by decreasing crossover rate")
             focus_generation:reset_mutation_rates()
             num_no_changes = 0
+            crossover_rate = 0
+            enabled_crossover_rate_modifier = true
         end
 
         write_data("gen"..focus_generation_key, focus_generation)
@@ -994,15 +1006,7 @@ function do_this_when_dead()
 
         focus_generation:sort_species()
         local average_fitness = focus_generation:get_fitness_sum() / #focus_generation.get_genomes()
-        if config.adaptive_mutate_mode ~= 0 then
-            for k1, v1 in pairs(focus_generation.species) do
-                for k2, v2 in pairs(v1.genomes) do
-                    if config.adaptive_mutate_mode == 1 then adaptive_mutate1(v2, average_fitness) end
-                    if config.adaptive_mutate_mode == 2 then adaptive_mutate2(v2) end
-                    if config.adaptive_mutate_mode == 3 then adaptive_mutate3(v2) end
-                end
-            end
-        end
+        adaptive_mutate()
 
         local strong_species = {}
         if strong_species_selector_mode == 0 then
@@ -1033,15 +1037,20 @@ function do_this_when_dead()
         table.sort(strong_species, compare1)
         local new_gen = new_generation()
         local carried_over_num = 0
+
+        local average_sum = 0
+        for k, v in pairs(strong_species) do
+            average_sum = average_sum + v:get_average_fitness()
+        end
+
         for k, v in pairs(strong_species) do
             local new_spec = new_species()
             local new_genomes_num = 0
             if config.use_adjusted_fitness then 
                 new_genomes_num = get_adjusted_fitness_sum(focus_generation:get_genomes(), v.genomes) / #focus_generation:get_genomes()
             else
-                new_genomes_num = (v.get_average_fitness() / (focus_generation:get_fitness_sum() / #focus_generation:get_genomes())) * config.population
+                new_genomes_num = (v:get_average_fitness() / average_sum) * config.population
             end
-            new_genomes_created = new_genomes_created + new_genomes_num
             if v.genomes[1].is_carried_over then
                 carried_over_num = carried_over_num + 1
             end
@@ -1050,7 +1059,7 @@ function do_this_when_dead()
             table.insert(new_spec.genomes, prev_g)
             for i=1, new_genomes_num do
                 local g = {}
-                if math.random() > config.crossover_rate then
+                if math.random() > crossover_rate then
                     g = copy_genome(v.genomes[1])
                 else
                     g = crossover(v.genomes[math.random(1, #v.genomes)], v.genomes[math.random(1, #v.genomes)])
@@ -1058,18 +1067,25 @@ function do_this_when_dead()
 
                 mutate(g)
                 table.insert(new_gen.unspecified_genomes, g)
+                new_genomes_created = new_genomes_created + 1
             end
             table.insert(new_gen.species, new_spec)
         end
 
-        print(prefix.network.."Created"..new_genomes_created.." genomes")
-        print(prefix.network.."Carried over "..carried_over_num.." species")
+        print(prefix.network.."Created "..new_genomes_created.." genomes")
+        print(prefix.network.."Carried over "..carried_over_num.." genomes")
         new_gen:find_all_species()
         focus_generation_key = focus_generation_key + 1
         focus_generation = new_gen
         focus_species_key = 1
         focus_genome_key = 1
         highest_fitness_score_generation = 0
+
+        if enabled_crossover_rate_modifier then
+            enabled_crossover_rate_modifier = false
+            crossover_rate = config.crossover_rate
+        end
+
     elseif focus_genome_key == #focus_species.genomes then
         focus_species_key = focus_species_key + 1
         focus_genome_key = 1
@@ -1164,6 +1180,5 @@ while (true) do
 
     test_next_gen()
     update_x_progress()
-
     emu.frameadvance()
 end
