@@ -31,7 +31,7 @@ config = {
     compatibility_threshold         = 3.0,
 
     -- [DefaultReproduction]
-    survival_threshold              = 0.2,
+    survival_threshold              = 0.3,
     use_adjusted_fitness            = false,
     crossover_rate                  = 0.70,
     crossover_rate_change           = 0.05,
