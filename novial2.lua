@@ -439,6 +439,10 @@ function new_genome()
             inputs["right"] = false
         end
 
+        for k, v in pairs(nodes) do
+            if v.type == "HIDDEN" then v.value = 0 end
+        end
+
         return inputs
     end
 
@@ -463,10 +467,11 @@ function new_genome()
         end
     end
 
-    function genome:draw_nodes()
+    function genome:draw_nodes(enable_innovs)
         for k, v in pairs(genome.hidden_nodes) do
             if v.type == "BIAS" or v.type == "HIDDEN" then
                 draw_world_tile(v.x, v.y, color1, color2)
+                if enable_innovs then gui.text(v.x, v.y, v.innov, color1) end
             end
         end
     end
@@ -850,9 +855,9 @@ function mutate(genome)
 
     mutate_type(genome.mutation_rates.node_delete_prob, mutate_node_delete)
     mutate_type(genome.mutation_rates.conn_delete_prob, mutate_conn_delete)
+    mutate_type(genome.mutation_rates.conn_add_prob, mutate_conn_add)
     mutate_type(genome.mutation_rates.node_add_prob, mutate_node_add)
     mutate_type(genome.mutation_rates.bias_add_prob, mutate_bias_add)
-    mutate_type(genome.mutation_rates.conn_add_prob, mutate_conn_add)
 end
 
 function crossover(genome1, genome2)
@@ -954,6 +959,46 @@ function write_data(file_name, data)
         file:write(compile_data(data))
         file:close()
     end
+end
+
+function load_data(file_name)
+    local file = io.open(file_name, "rb")
+    local data = new_genome()
+
+    local function split(inputstr, sep)
+        if sep == nil then
+           sep = "%s"
+        end
+        local t={}
+        for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+           table.insert(t, str)
+        end
+        return t
+    end
+
+    for line in io.lines(file_name) do
+        local split_data = split(line, ", ")
+        if split_data[2] == "[node]" then
+            if split_data[6] ~= "OUTPUT" and split_data[6] ~= "BIAS" then
+                local n = new_node(0, split_data[6], 0)
+                n.x = tonumber(split_data[8]:sub(2))
+                n.y = tonumber(split_data[9]:sub(1, -2))
+
+                table.insert(data.hidden_nodes, n)
+            end
+        elseif split_data[2] == "[conn]" then
+            local c = new_connection(
+                tonumber(split_data[8]),
+                tonumber(split_data[10]),
+                tonumber(split_data[6])
+            )
+            c.enabled = split_data[12] == "true"
+            table.insert(data.connections, c)
+        end
+    end
+
+    print(data)
+    return data
 end
 
 function do_this_when_dead()
@@ -1145,15 +1190,16 @@ function is_dead()
     return memory.readbyte(0x000E) == 0x0B or memory.readbyte(0x000E) == 0x06 -- 6 is dead, 11 is dying
 end
 
-emu.poweron()
+-- focus_genome = load_data("genome.txt")
 
+emu.poweron()
 while (true) do
     get_positions()
     ai_inputs = get_map()
     read_enemies(ai_inputs)
     draw_map(ai_inputs)
     focus_genome:draw_connections()
-    focus_genome:draw_nodes()
+    focus_genome:draw_nodes(false)
     focus_genome:eval()
     joypad.set(1, inputs)
     draw_buttons()
