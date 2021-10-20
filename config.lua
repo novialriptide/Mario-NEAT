@@ -10,6 +10,7 @@
 config = {
     fitness_threshold               = 3500, -- found solution
     population                      = 300,
+    reaction_time                   = 5, -- update eval after how many frames
 
     -- [Draw]
     draw_nodes                      = false,

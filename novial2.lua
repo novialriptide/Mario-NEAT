@@ -1131,10 +1131,10 @@ function do_this_when_dead()
         print(prefix.network.."Created "..new_genomes_created.." genomes")
         print(prefix.network.."Carried over "..carried_over_num.." genomes")
         local species_found_num = new_gen:find_all_species() + carried_over_num
-        if species_found_num >= 4 then
-            print(prefix.network.."Found "..species_found_num.." species")
+        if #new_gen.species >= 4 then
+            print(prefix.network.."Found "..#new_gen.species.." species")
         else
-            print(prefix.warning.."Found a low number of species ("..species_found_num.." species) Adding 5 backup genomes")
+            print(prefix.warning.."Found a low number of species ("..#new_gen.species.." species) Adding 5 backup genomes")
             for i=1, config.backup_per_gen do
                 table.insert(new_gen.unspecified_genomes, copy_genome(backup_genomes[math.random(1, #backup_genomes)]))
             end
@@ -1219,7 +1219,7 @@ while (true) do
     draw_map(ai_inputs)
     if config.draw_connections then focus_genome:draw_connections() end
     if config.draw_nodes then focus_genome:draw_nodes(false) end
-    if current_frame % 5 == 0 then focus_genome:eval() end
+    if current_frame % config.reaction_time == 0 then focus_genome:eval() end
     joypad.set(1, inputs)
     draw_buttons()
     draw_info(focus_generation_key, focus_species_key, focus_genome_key, focus_genome:get_fitness())
