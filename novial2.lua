@@ -25,16 +25,15 @@ x_progress = 0
 mario_map_x = 0
 mario_map_y = 0
 
+backup_genomes = {}
 moving_objects = {}
 inputs_keys = {"A", "B", "right", "left"}
 inputs = {}
 is_nudged = false
 is_timer_set = false
 start_timeout = 0
-
 crossover_rate = config.crossover_rate
 enabled_crossover_rate_modifier = false
-
 prefix = {error = "[Error]: ", warning = "[Warning]: ", network = "[Network]: "}
 
 function clear_joypad()
@@ -967,24 +966,39 @@ function write_data(file_name, data)
     end
 end
 
-function load_data(file_name)
+function load_gen(file_name)
+    -- broken
     local file = io.open(file_name, "rb")
+    local data_gen = new_generation()
+    table.insert(data_gen.species, new_species())
     local data = new_genome()
 
     local function split(inputstr, sep)
-        if sep == nil then
-           sep = "%s"
-        end
-        local t={}
+        if sep == nil then sep = "%s" end
+        local t = {}
         for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
            table.insert(t, str)
         end
         return t
     end
 
+    local current_species = 1
+    local current_genome = 1
+    local line_num = 1
     for line in io.lines(file_name) do
         local split_data = split(line, ", ")
-        if split_data[2] == "[node]" then
+
+        if split_data[1] == "species:" and line_nums ~= 2 then
+            if tonumber(split_data[2]) > current_species then
+                table.insert(data_gen.species[current_species].genomes, data)
+                data = new_genome()
+                table.insert(data_gen.species, new_species())
+                current_species = current_species + 1
+            else
+                table.insert(data_gen.species[current_species].genomes, data)
+                data = new_genome()
+            end
+        elseif split_data[2] == "[node]" then
             if split_data[6] ~= "OUTPUT" and split_data[6] ~= "BIAS" then
                 local n = new_node(0, split_data[6], 0)
                 n.x = tonumber(split_data[8]:sub(2))
@@ -1001,10 +1015,11 @@ function load_data(file_name)
             c.enabled = split_data[12] == "true"
             table.insert(data.connections, c)
         end
+
+        line_num = line_num + 1
     end
 
-    print(data)
-    return data
+    return data_gen
 end
 
 function do_this_when_dead()
@@ -1123,14 +1138,24 @@ function do_this_when_dead()
             table.insert(new_gen.species, new_spec)
         end
 
+        print(prefix.network.."Backing up "..config.backup_per_gen.." genomes")
+        for i=1, config.backup_per_gen do
+            table.insert(backup_genomes, copy_genome(new_gen:get_genomes()[math.random(1, #new_gen:get_genomes())]))
+        end
+
         print(prefix.network.."Created "..new_genomes_created.." genomes")
         print(prefix.network.."Carried over "..carried_over_num.." genomes")
-        local species_found_num = new_gen:find_all_species()
-        if species_found_num >= 3 then
+        local species_found_num = new_gen:find_all_species() + carried_over_num
+        if species_found_num >= 4 then
             print(prefix.network.."Found "..species_found_num.." species")
         else
-            print(prefix.warning.."Found a low number of species ("..species_found_num..")")
+            print(prefix.warning.."Found a low number of species ("..species_found_num.." species) Adding 5 backup genomes")
+            for i=1, config.backup_per_gen do
+                table.insert(new_gen.unspecified_genomes, copy_genome(backup_genomes[math.random(1, #backup_genomes)]))
+            end
+            new_gen:find_all_species()
         end
+
         focus_generation_key = focus_generation_key + 1
         focus_generation = new_gen
         focus_species_key = 1
@@ -1141,7 +1166,6 @@ function do_this_when_dead()
             enabled_crossover_rate_modifier = false
             crossover_rate = config.crossover_rate
         end
-
     elseif focus_genome_key == #focus_species.genomes then
         focus_species_key = focus_species_key + 1
         focus_genome_key = 1
@@ -1201,8 +1225,7 @@ function is_dead()
     return memory.readbyte(0x000E) == 0x0B or memory.readbyte(0x000E) == 0x06 -- 6 is dead, 11 is dying
 end
 
--- focus_genome = load_data("genome.txt")
-
+-- focus_genome = load_gen("saves/gen1.txt")
 emu.poweron()
 while (true) do
     get_positions()

@@ -18,8 +18,8 @@ config = {
     weight_max_value                = 30,
     weight_min_value                = -30,
     weight_add_value                = 5,
-    weight_add_prob                 = 0.1,
-    weight_mutate_prob              = 0.1,
+    weight_add_prob                 = 0.01,
+    weight_mutate_prob              = 0.01,
     enabled_default                 = true,
     enabled_mutate_prob             = 0.2,
     node_add_prob                   = 0.5,
@@ -29,9 +29,10 @@ config = {
 
     -- [DefaultSpeciesSet]
     compatibility_threshold         = 3.0,
+    backup_per_gen                  = 10,
 
     -- [DefaultReproduction]
-    survival_threshold              = 0.3,
+    survival_threshold              = 0.35,
     use_adjusted_fitness            = false,
     crossover_rate                  = 0.70,
     crossover_rate_change           = 0.05,
