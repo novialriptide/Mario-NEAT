@@ -18,6 +18,12 @@ color3 = {r = 190, g = 0, b = 0, a = 255}
 color4 = {r = 164, g = 0, b = 0, a = 255}
 color5 = {r = 22, g = 99, b = 32, a = 255}
 
+color1 = cffff6060
+color2 = cff00ccff
+color3 = cff00C78C
+color4 = cff00FF7F
+color5 = cffADFF2F
+
 mario_x = 0
 mario_y = 0
 x_progress = 0
@@ -25,10 +31,9 @@ x_progress = 0
 mario_map_x = 0
 mario_map_y = 0
 
-current_frame = 0
 backup_genomes = {}
 moving_objects = {}
-inputs_keys = {"A", "B", "right", "left"}
+inputs_keys = {"A", "B", "Right", "Left"}
 inputs = {}
 is_nudged = false
 is_timer_set = false
@@ -44,7 +49,7 @@ function clear_joypad()
         inputs[inputs_keys[k]] = false
     end
 
-    joypad.set(1, inputs)
+    joypad.set(inputs, 1)
 end
 
 function sigmoid(x)
@@ -100,17 +105,17 @@ end
 ai_inputs = get_map()
 
 function draw_world_tile(x, y, color1, color2)
-    gui.drawbox(x, y, x+box_size, y+box_size, color2, color1)
+    gui.drawBox(x, y, x+box_size, y+box_size, color2, color1)
 end
 
 function draw_map(level)
     local function draw_tile(x, y, color1, color2)
         local x = x - 2
-        gui.drawbox(x_offset+x*box_size, y_offset+y*box_size, x_offset+x*box_size+box_size, y_offset+y*box_size+box_size, color2, color1)
+        gui.drawBox(x_offset+x*box_size, y_offset+y*box_size, x_offset+x*box_size+box_size, y_offset+y*box_size+box_size, color2, color1)
     end
     local columns = 16
     local rows = 14
-    gui.drawbox(x_offset-box_size, y_offset+box_size, x_offset+columns*box_size, y_offset+rows*box_size, color2, color2)
+    gui.drawBox(x_offset-box_size, y_offset+box_size, x_offset+columns*box_size, y_offset+rows*box_size, color2, color2)
     if mario_map_x > 0 and mario_map_x < table.getn(level[1]) and mario_map_y > 0 and mario_map_y < table.getn(level) then
         draw_tile(mario_map_x, mario_map_y, color3, color3)
     end
@@ -140,11 +145,11 @@ end
 
 function draw_buttons()
     for k, v in pairs(inputs_keys) do
-        local _inputs = joypad.read(1)
+        local _inputs = joypad.get(1)
         if _inputs[v] then
-            gui.drawtext(210, y_offset + (k-1)*10, v, color1, color2)
+            gui.drawText(210, y_offset + (k-1)*10, v, color1, color2)
         else
-            gui.drawtext(210, y_offset + (k-1)*10, v, color3, color2)
+            gui.drawText(210, y_offset + (k-1)*10, v, color3, color2)
         end
     end
 end
@@ -458,10 +463,10 @@ function new_genome()
                 
                 if node_in.type == "INPUT" then
                     converted_coords = cell_to_screen(node_in.x, node_in.y)
-                    gui.drawline(converted_coords.x, converted_coords.y, node_out.x+box_size/2, node_out.y+box_size/2, color)
+                    gui.drawLine(converted_coords.x, converted_coords.y, node_out.x+box_size/2, node_out.y+box_size/2, color)
                 end
                 if node_in.type == "HIDDEN" or node_in.type == "BIAS" then
-                    gui.drawline(node_in.x, node_in.y, node_out.x+box_size/2, node_out.y+box_size/2, color)
+                    gui.drawLine(node_in.x, node_in.y, node_out.x+box_size/2, node_out.y+box_size/2, color)
                 end
             end
         end
@@ -967,24 +972,39 @@ function write_data(file_name, data)
     end
 end
 
-function load_data(file_name)
+function load_gen(file_name)
+    -- broken
     local file = io.open(file_name, "rb")
+    local data_gen = new_generation()
+    table.insert(data_gen.species, new_species())
     local data = new_genome()
 
     local function split(inputstr, sep)
-        if sep == nil then
-           sep = "%s"
-        end
-        local t={}
+        if sep == nil then sep = "%s" end
+        local t = {}
         for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
            table.insert(t, str)
         end
         return t
     end
 
+    local current_species = 1
+    local current_genome = 1
+    local line_num = 1
     for line in io.lines(file_name) do
         local split_data = split(line, ", ")
-        if split_data[2] == "[node]" then
+
+        if split_data[1] == "species:" and line_nums ~= 2 then
+            if tonumber(split_data[2]) > current_species then
+                table.insert(data_gen.species[current_species].genomes, data)
+                data = new_genome()
+                table.insert(data_gen.species, new_species())
+                current_species = current_species + 1
+            else
+                table.insert(data_gen.species[current_species].genomes, data)
+                data = new_genome()
+            end
+        elseif split_data[2] == "[node]" then
             if split_data[6] ~= "OUTPUT" and split_data[6] ~= "BIAS" then
                 local n = new_node(0, split_data[6], 0)
                 n.x = tonumber(split_data[8]:sub(2))
@@ -1001,10 +1021,11 @@ function load_data(file_name)
             c.enabled = split_data[12] == "true"
             table.insert(data.connections, c)
         end
+
+        line_num = line_num + 1
     end
 
-    print(data)
-    return data
+    return data_gen
 end
 
 function do_this_when_dead()
@@ -1032,7 +1053,7 @@ function do_this_when_dead()
         highest_fitness_score_generation = focus_genome.calculated_fitness
         print(prefix.network.."Highest Fitness Gen : "..highest_fitness_score_generation)
     end
-    emu.poweron()
+    client.reboot_core()
     if focus_species_key == #focus_generation.species then
         print(prefix.network.."The average fitness score for generation "..focus_generation_key.." is "..focus_generation:get_fitness_sum() / #focus_generation:get_genomes())
         if num_no_changes > config.emergency_reproduce and strong_species_selector_mode ~= 0 and config.enable_emergency_reproduce then
@@ -1167,9 +1188,9 @@ end
 
 function test_next_gen()
     if memory.readbyte(0x0770) == 0 then
-        joypad.set(1, {start = true})
+        joypad.set({Start = true}, 1)
         emu.frameadvance()
-        joypad.set(1, {start = false})
+        joypad.set({Start = false}, 1)
         x_progress = 0
         clear_joypad()
     end
@@ -1188,7 +1209,7 @@ end
 function draw_info(generation, species, genome, fitness)
     local text = {"gen: "..generation, "species: "..species, "genome: "..genome, "fitness: "..fitness}
     for i=0, #text-1 do
-        gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16+8*i, text[i+1], color1, color2)
+        gui.drawText(x_offset - 3, y_offset + - 3 + box_size*16+8*i, text[i+1], color1, color2)
     end
 end
 
@@ -1210,17 +1231,17 @@ function is_dead()
     return memory.readbyte(0x000E) == 0x0B or memory.readbyte(0x000E) == 0x06 -- 6 is dead, 11 is dying
 end
 
-focus_genome = load_data("genome.txt")
-emu.poweron()
+-- focus_genome = load_gen("saves/gen1.txt")
+client.reboot_core()
 while (true) do
     get_positions()
     ai_inputs = get_map()
     read_enemies(ai_inputs)
     draw_map(ai_inputs)
-    if config.draw_connections then focus_genome:draw_connections() end
-    if config.draw_nodes then focus_genome:draw_nodes(false) end
-    if current_frame % 5 == 0 then focus_genome:eval() end
-    joypad.set(1, inputs)
+    focus_genome:draw_connections()
+    focus_genome:draw_nodes(false)
+    focus_genome:eval()
+    joypad.set(inputs, 1)
     draw_buttons()
     draw_info(focus_generation_key, focus_species_key, focus_genome_key, focus_genome:get_fitness())
 
@@ -1246,5 +1267,4 @@ while (true) do
     test_next_gen()
     update_x_progress()
     emu.frameadvance()
-    current_frame = current_frame + 1
 end

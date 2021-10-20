@@ -11,6 +11,10 @@ config = {
     fitness_threshold               = 3500, -- found solution
     population                      = 300,
 
+    -- [Draw]
+    draw_nodes                      = false,
+    draw_connections                = false,
+
     -- [DefaultGenome]
     num_inputs                      = 13*17,
     conn_add_prob                   = 2.5,
