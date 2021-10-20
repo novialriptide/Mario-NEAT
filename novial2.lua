@@ -1074,6 +1074,14 @@ function do_this_when_dead()
             end
         end
 
+        if strong_species_selector_mode == 2 then
+            for k, v in pairs(focus_generation.species) do
+                if v.genomes[1].calculated_fitness >= focus_generation:get_fitness_sum() / #focus_generation:get_genomes() then
+                    table.insert(strong_species, v)
+                end
+            end
+        end
+
         print(prefix.network..#strong_species.." species have survived to the next generation")
 
         local function compare1(a,b)
