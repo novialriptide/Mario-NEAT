@@ -676,6 +676,17 @@ function new_generation()
         return sum
     end
 
+    function generation:get_fitness_average()
+        local genomes = generation:get_genomes()
+        local sum = 0
+        for k, v in pairs(genomes) do
+            sum = sum + v.calculated_fitness
+        end
+
+        print(sum, #genomes)
+        return sum / #genomes
+    end
+
     function generation:sort_species()
         local function compare(a,b)
             return a.genomes[1].calculated_fitness > b.genomes[1].calculated_fitness
@@ -1034,7 +1045,8 @@ function do_this_when_dead()
     end
     emu.poweron()
     if focus_species_key == #focus_generation.species then
-        print(prefix.network.."The average fitness score for generation "..focus_generation_key.." is "..focus_generation:get_fitness_sum() / #focus_generation:get_genomes())
+        local average_fitness = focus_generation:get_fitness_average()
+        print(prefix.network.."The average fitness score for generation "..focus_generation_key.." is "..average_fitness)
         if num_no_changes > config.emergency_reproduce and strong_species_selector_mode ~= 0 and config.enable_emergency_reproduce then
             print(prefix.warning.."Changing strong_species_selector_mode to 0")
             strong_species_selector_mode = 0
@@ -1056,7 +1068,6 @@ function do_this_when_dead()
         end
 
         focus_generation:sort_species()
-        local average_fitness = focus_generation:get_fitness_sum() / #focus_generation.get_genomes()
         adaptive_mutate()
 
         local strong_species = {}
@@ -1076,7 +1087,7 @@ function do_this_when_dead()
 
         if strong_species_selector_mode == 2 then
             for k, v in pairs(focus_generation.species) do
-                if v.genomes[1].calculated_fitness >= focus_generation:get_fitness_sum() / #focus_generation:get_genomes() then
+                if v.genomes[1].calculated_fitness >= average_fitness then
                     table.insert(strong_species, v)
                 end
             end
