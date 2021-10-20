@@ -624,16 +624,22 @@ function new_generation()
             local species = new_species()
             table.insert(species.genomes, genome)
             table.insert(generation.species, species)
-            print(prefix.network.."Found a new species")
+            return true
         end
+
+        return false
     end
 
     function generation:find_all_species()
+        local species_found = 0
         for k, v in pairs(generation.unspecified_genomes) do
-            generation:_find_species(v)
+            if generation:_find_species(v) then
+                species_found = species_found + 1
+            end
         end
 
         generation.unspecified_genomes = {}
+        return species_found
     end
 
     function generation:get_population_size()
@@ -1074,7 +1080,12 @@ function do_this_when_dead()
 
         print(prefix.network.."Created "..new_genomes_created.." genomes")
         print(prefix.network.."Carried over "..carried_over_num.." genomes")
-        new_gen:find_all_species()
+        local species_found_num = new_gen:find_all_species()
+        if species_found_num >= 3 then
+            print(prefix.network.."Found "..species_found_num.." species")
+        else
+            print(prefix.warning.."Found a low number of species ("..species_found_num..")")
+        end
         focus_generation_key = focus_generation_key + 1
         focus_generation = new_gen
         focus_species_key = 1
