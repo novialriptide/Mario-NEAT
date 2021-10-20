@@ -1210,7 +1210,7 @@ function is_dead()
     return memory.readbyte(0x000E) == 0x0B or memory.readbyte(0x000E) == 0x06 -- 6 is dead, 11 is dying
 end
 
-focus_genome = load_data("genome.txt")
+-- focus_genome = load_data("genome.txt")
 emu.poweron()
 while (true) do
     get_positions()
