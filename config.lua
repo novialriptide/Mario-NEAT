@@ -37,7 +37,7 @@ config = {
     backup_per_gen                  = 10,
 
     -- [DefaultReproduction]
-    survival_threshold              = 0.35,
+    survival_threshold              = 0.3,
     use_adjusted_fitness            = false,
     crossover_rate                  = 0.70,
     crossover_rate_change           = 0.05,
