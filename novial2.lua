@@ -315,28 +315,24 @@ function new_genome()
     end
 
     function genome:add_connection(node1, node2, weight)
-        if genome:get_node(node2).type == "BIAS" or genome:get_node(node2).type == "INPUT" then
-            return false
-        end
+        if genome:get_node(node2).type == "BIAS" or genome:get_node(node2).type == "INPUT" then return false end
 
         local connect_node = new_connection(node1, node2, math.random(config.weight_min_value, config.weight_max_value) + math.random())
-        if weight ~= nil then
-            connect_node.weight = weight
-        end
+        if weight ~= nil then connect_node.weight = weight end
 
-        -- must add a try except thing to cover nodes that dont exist
         if genome:does_node_exist(node1) and genome:does_node_exist(node2) then
+            for k, v in pairs(genome.connections) do
+                -- test if the connection is already implemented
+                if v.node_in == connect_node.node_in and v.node_out == connect_node.node_out then
+                    return false
+                end
+            end
+
             for k, v in pairs(global_connections) do
-                if connect_node.node_in == v.node_in and connect_node.node_out == v.node_out then
-                    for k, v in pairs(genome.connections) do
-                        -- test if the connection is already implemented
-                        if v == connect_node then
-                            return
-                        end
-                    end        
+                if connect_node.node_in == v.node_in and connect_node.node_out == v.node_out then     
                     connect_node.innov = v.innov
                     table.insert(genome.connections, connect_node)
-                    return
+                    return true
                 end
             end
             connect_node.innov = connect_gene_innov
@@ -928,9 +924,15 @@ highest_fitness_score_generation = 0
 
 focus_generation = new_inital_generation(config.population)
 adaptive_mutate()
-focus_generation:mutate_genomes()
+-- focus_generation:mutate_genomes()
 focus_species = focus_generation.species[focus_species_key]
-focus_genome = focus_species.genomes[focus_genome_key]
+focus_genome = new_genome()
+
+focus_genome.connections = {{enabled=true, innov=191, node_out=224, weight=28.5197302164, mutation_modifier=1, node_in=210}, {enabled=true, innov=64, node_out=223, weight=22.1894894253, mutation_modifier=1, node_in=183}, {enabled=true, innov=425, node_out=227, weight=2.23963133641, mutation_modifier=1, node_in=182}, {enabled=true, innov=50, node_out=222, weight=9.78658406323, mutation_modifier=1, node_in=227}, {enabled=true, innov=675, node_out=227, weight=16.3711966308, mutation_modifier=1, node_in=21}, {enabled=true, innov=676, node_out=228, weight=-6.46452223273, mutation_modifier=1, node_in=68}, {enabled=true, innov=644, node_out=225, weight=-18.384807886, mutation_modifier=1, node_in=228}, {enabled=true, innov=915, node_out=222, weight=5.81649220252, mutation_modifier=1, node_in=180}, {enabled=true, innov=38, node_out=225, weight=-15.3570360424, mutation_modifier=1, node_in=149}, {enabled=true, innov=514, node_out=222, weight=28.9343546861, mutation_modifier=1, node_in=135}, {enabled=true, innov=642, node_out=227, weight=-24.8367564928, mutation_modifier=1, node_in=227}, {enabled=true, innov=66, node_out=224, weight=27.8355052339, mutation_modifier=1, node_in=226}, {enabled=true, innov=476, node_out=224, weight=-10.8478957488, mutation_modifier=1, node_in=163}, {enabled=true, innov=593, node_out=227, weight=-23.0878933073, mutation_modifier=1, node_in=223}, {enabled=true, innov=641, node_out=227, weight=-14.0122379223, mutation_modifier=1, node_in=228}, {enabled=true, innov=1300, node_out=223, weight=29.7269203772, mutation_modifier=1, node_in=106}, {enabled=true, innov=989, node_out=229, weight=-8.44544816431, mutation_modifier=1, node_in=93}, {enabled=true, innov=886, node_out=227, weight=29.4616534928, mutation_modifier=1, node_in=229}}
+focus_genome.hidden_nodes = {{y=34, innov=227, value=0, x=89, type='HIDDEN'}, {y=52, innov=228, value=0, x=149, type='HIDDEN'}, {y=75, innov=229, value=0, x=142, type='HIDDEN'}}
+focus_species_key = 3
+focus_generation_key = 17
+focus_genome_key = 1
 
 --[[
 focus_genome.connections = {}
@@ -1195,8 +1197,8 @@ function test_next_gen()
 
     if memory.readbyte(0x0770) == 1 and focus_genome:get_fitness() >= config.fitness_threshold then -- this was implemented after the simulation started
         write_data("gen"..focus_generation_key, focus_generation)
-        print(prefix.network.."ya boi reached it..")
-        print(focus_genome)
+        -- print(prefix.network.."ya boi reached it..")
+        -- print(focus_genome)
         return
     end
 
