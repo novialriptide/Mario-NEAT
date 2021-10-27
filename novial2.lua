@@ -924,26 +924,10 @@ highest_fitness_score_generation = 0
 
 focus_generation = new_inital_generation(config.population)
 adaptive_mutate()
--- focus_generation:mutate_genomes()
+focus_generation:mutate_genomes()
 focus_species = focus_generation.species[focus_species_key]
 focus_genome = new_genome()
 
-focus_genome.connections = {{enabled=true, innov=191, node_out=224, weight=28.5197302164, mutation_modifier=1, node_in=210}, {enabled=true, innov=64, node_out=223, weight=22.1894894253, mutation_modifier=1, node_in=183}, {enabled=true, innov=425, node_out=227, weight=2.23963133641, mutation_modifier=1, node_in=182}, {enabled=true, innov=50, node_out=222, weight=9.78658406323, mutation_modifier=1, node_in=227}, {enabled=true, innov=675, node_out=227, weight=16.3711966308, mutation_modifier=1, node_in=21}, {enabled=true, innov=676, node_out=228, weight=-6.46452223273, mutation_modifier=1, node_in=68}, {enabled=true, innov=644, node_out=225, weight=-18.384807886, mutation_modifier=1, node_in=228}, {enabled=true, innov=915, node_out=222, weight=5.81649220252, mutation_modifier=1, node_in=180}, {enabled=true, innov=38, node_out=225, weight=-15.3570360424, mutation_modifier=1, node_in=149}, {enabled=true, innov=514, node_out=222, weight=28.9343546861, mutation_modifier=1, node_in=135}, {enabled=true, innov=642, node_out=227, weight=-24.8367564928, mutation_modifier=1, node_in=227}, {enabled=true, innov=66, node_out=224, weight=27.8355052339, mutation_modifier=1, node_in=226}, {enabled=true, innov=476, node_out=224, weight=-10.8478957488, mutation_modifier=1, node_in=163}, {enabled=true, innov=593, node_out=227, weight=-23.0878933073, mutation_modifier=1, node_in=223}, {enabled=true, innov=641, node_out=227, weight=-14.0122379223, mutation_modifier=1, node_in=228}, {enabled=true, innov=1300, node_out=223, weight=29.7269203772, mutation_modifier=1, node_in=106}, {enabled=true, innov=989, node_out=229, weight=-8.44544816431, mutation_modifier=1, node_in=93}, {enabled=true, innov=886, node_out=227, weight=29.4616534928, mutation_modifier=1, node_in=229}}
-focus_genome.hidden_nodes = {{y=34, innov=227, value=0, x=89, type='HIDDEN'}, {y=52, innov=228, value=0, x=149, type='HIDDEN'}, {y=75, innov=229, value=0, x=142, type='HIDDEN'}}
-focus_species_key = 3
-focus_generation_key = 17
-focus_genome_key = 1
-
---[[
-focus_genome.connections = {}
-focus_genome:add_connection(196, 222, -10)
-focus_genome:add_node()
-focus_genome.connections[1].weight = -10
-focus_genome.connections[2].weight = 5
-focus_genome:add_connection(226, 224, 10)
-focus_genome:add_connection(161, 222, 10)
-focus_genome:add_connection(179, 222, 10)
-]]--
 function write_data(file_name, data)
     local function compile_data(data)
         local compiled_data = "crossover rate: "..crossover_rate..""
@@ -1025,7 +1009,6 @@ function do_this_when_dead()
     clear_joypad()
     local survival_num = #focus_generation.species * config.survival_threshold + 1
     local strong_species_selector_mode = config.strong_species_selector_mode
-    -- local survival_num = math.min(#focus_generation.species, 2)
     focus_genome.calculated_fitness = focus_genome:get_fitness()
 
     if focus_species_key == #focus_generation.species then
@@ -1197,8 +1180,8 @@ function test_next_gen()
 
     if memory.readbyte(0x0770) == 1 and focus_genome:get_fitness() >= config.fitness_threshold then -- this was implemented after the simulation started
         write_data("gen"..focus_generation_key, focus_generation)
-        -- print(prefix.network.."ya boi reached it..")
-        -- print(focus_genome)
+        print(prefix.network.."ya boi reached it..")
+        print(focus_genome)
         return
     end
 
@@ -1231,7 +1214,6 @@ function is_dead()
     return memory.readbyte(0x000E) == 0x0B or memory.readbyte(0x000E) == 0x06 -- 6 is dead, 11 is dying
 end
 
--- focus_genome = load_data("genome.txt")
 emu.poweron()
 while (true) do
     get_positions()

@@ -13,8 +13,8 @@ config = {
     reaction_time                   = 5, -- update eval after how many frames
 
     -- [Draw]
-    draw_nodes                      = true,
-    draw_connections                = true,
+    draw_nodes                      = false,
+    draw_connections                = false,
 
     -- [DefaultGenome]
     num_inputs                      = 13*17,
