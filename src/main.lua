@@ -793,7 +793,7 @@ function test_next_gen()
     if memory.readbyte(0x0770) == 1 and focus_genome:get_fitness() >= config.fitness_threshold then -- this was implemented after the simulation started
         write_data("gen"..focus_generation_key, focus_generation)
         print(prefix.network.."ya boi reached it..")
-        print(focus_genome)
+        emu.pause()
         return
     end
 
