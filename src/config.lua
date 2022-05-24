@@ -1,13 +1,9 @@
 -- Config taken from:
 -- https://github.com/CodeReclaimers/neat-python/blob/master/examples/memory-fixed/config
 
--- NEAT configuration for the fixed-length bit-sequence memory experiment.
-
--- The `NEAT` section specifies parameters particular to the NEAT algorithm
--- or the experiment itself.  This is the only required section.
---  [NEAT]
-
 config = {
+    enable_nudge                    = false, -- refreshes the joypad incase Mario gets stuck
+
     fitness_threshold               = 3500, -- found solution
     population                      = 300,
     reaction_time                   = 5, -- update eval after how many frames

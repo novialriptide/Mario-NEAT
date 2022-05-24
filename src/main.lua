@@ -4,19 +4,8 @@
 --              https://www.mdpi.com/2078-2489/10/12/390/pdf
 
 config = require("config")
+const = require("const")
 math.randomseed(os.time())
-
-box_size = 4
-x_offset = 20
-y_offset = 40
-x_bias = 80
-y_bias = 100
-
-color1 = {r = 255, g = 0, b = 0, a = 255}
-color2 = {r = 93, g = 6, b = 0, a = 255}
-color3 = {r = 190, g = 0, b = 0, a = 255}
-color4 = {r = 164, g = 0, b = 0, a = 255}
-color5 = {r = 22, g = 99, b = 32, a = 255}
 
 mario_x = 0
 mario_y = 0
@@ -45,10 +34,6 @@ function clear_joypad()
     end
 
     joypad.set(1, inputs)
-end
-
-function sigmoid(x)
-    return 1 / (1 + math.pow(2.71828, -x))
 end
 
 function get_game_timer()
@@ -100,24 +85,53 @@ end
 ai_inputs = get_map()
 
 function draw_world_tile(x, y, color1, color2)
-    gui.drawbox(x, y, x+box_size, y+box_size, color2, color1)
+    gui.drawbox(
+        x, y, 
+        x + const.box_size, 
+        y + const.box_size, 
+        color2, 
+        color1
+    )
 end
 
 function draw_map(level)
     local function draw_tile(x, y, color1, color2)
         local x = x - 2
-        gui.drawbox(x_offset+x*box_size, y_offset+y*box_size, x_offset+x*box_size+box_size, y_offset+y*box_size+box_size, color2, color1)
+        gui.drawbox(
+            const.x_offset + x * const.box_size, 
+            const.y_offset + y * const.box_size, 
+            const.x_offset + x * const.box_size + const.box_size, 
+            const.y_offset + y * const.box_size + const.box_size, 
+            color2, 
+            color1
+        )
     end
     local columns = 16
     local rows = 14
-    gui.drawbox(x_offset-box_size, y_offset+box_size, x_offset+columns*box_size, y_offset+rows*box_size, color2, color2)
+    gui.drawbox(
+        const.x_offset - const.box_size,
+        const.y_offset + const.box_size,
+        const.x_offset + columns * const.box_size,
+        const.y_offset + rows * const.box_size,
+        const.color2,
+        const.color2
+    )
     if mario_map_x > 0 and mario_map_x < table.getn(level[1]) and mario_map_y > 0 and mario_map_y < table.getn(level) then
-        draw_tile(mario_map_x, mario_map_y, color3, color3)
+        draw_tile(
+            mario_map_x,
+            mario_map_y,
+            const.color3,
+            const.color3
+        )
     end
     for y=1, table.getn(level), 1 do
         for x=1, table.getn(level[y]), 1 do
-            if level[y][x] == 1 then draw_tile(x, y, color1, color2) end
-            if level[y][x] >= 3 then draw_tile(x, y, color4, color4) end
+            if level[y][x] == 1 then 
+                draw_tile(x, y, const.color1, const.color2) 
+            end
+            if level[y][x] >= 3 then 
+                draw_tile(x, y, const.color4, const.color4) 
+            end
         end
     end
 end
@@ -142,15 +156,21 @@ function draw_buttons()
     for k, v in pairs(inputs_keys) do
         local _inputs = joypad.read(1)
         if _inputs[v] then
-            gui.drawtext(210, y_offset + (k-1)*10, v, color1, color2)
+            gui.drawtext(
+                210, 
+                const.y_offset + (k-1) * 10, v, 
+                const.color1, const.color2
+            )
         else
-            gui.drawtext(210, y_offset + (k-1)*10, v, color3, color2)
+            gui.drawtext(
+                210,
+                const.y_offset + (k - 1) * 10, v,
+                const.color3,
+                const.color2
+            )
         end
     end
 end
-
-connect_gene_innov = 1
-global_connections = {}
 
 function map_to_list(level_data)
     local map_list = {}
@@ -162,8 +182,18 @@ function map_to_list(level_data)
     return map_list
 end
 
+connect_gene_innov = 1
+global_connections = {}
+
+function sigmoid(x)
+    return 1 / (1 + math.pow(2.71828, -x))
+end
+
 function cell_to_screen(x, y)
-    return {x = x_offset+(x-2)*box_size + box_size/2, y = y_offset+(y-0)*box_size + box_size/2}
+    return {
+        x = const.x_offset+(x-2)*const.box_size + const.box_size/2,
+        y = const.y_offset+(y-0)*const.box_size + const.box_size/2
+    }
 end
 
 function random_screen_coords()
@@ -171,7 +201,7 @@ function random_screen_coords()
 end
 
 function get_button_coords(button_number)
-    return {x = 210, y = y_offset + (button_number-1)*10}
+    return {x = 210, y = const.y_offset + (button_number-1) * 10}
 end
 
 function get_diff_genes(genome1, genome2)
@@ -448,16 +478,32 @@ function new_genome()
                 local node_in = genome:get_node(v.node_in)
                 local node_out = genome:get_node(v.node_out)
                 local converted_coords = {}
-                local color = color3
-                if v.weight >= 0 then color = color5 end 
-                if not v.enabled then color = {r = 0, g = 0, b = 255} end
+                local color = const.color3
+                if v.weight >= 0 then 
+                    color = const.color5 
+                end 
+                if not v.enabled then 
+                    color = {r = 0, g = 0, b = 255} 
+                end
                 
                 if node_in.type == "INPUT" then
                     converted_coords = cell_to_screen(node_in.x, node_in.y)
-                    gui.drawline(converted_coords.x, converted_coords.y, node_out.x+box_size/2, node_out.y+box_size/2, color)
+                    gui.drawline(
+                        converted_coords.x,
+                        converted_coords.y,
+                        node_out.x+const.box_size/2,
+                        node_out.y+const.box_size/2,
+                        color
+                    )
                 end
                 if node_in.type == "HIDDEN" or node_in.type == "BIAS" then
-                    gui.drawline(node_in.x, node_in.y, node_out.x+box_size/2, node_out.y+box_size/2, color)
+                    gui.drawline(
+                        node_in.x,
+                        node_in.y,
+                        node_out.x + const.box_size/2,
+                        node_out.y + const.box_size/2,
+                        color
+                    )
                 end
             end
         end
@@ -466,8 +512,14 @@ function new_genome()
     function genome:draw_nodes(enable_innovs)
         for k, v in pairs(genome.hidden_nodes) do
             if v.type == "BIAS" or v.type == "HIDDEN" then
-                draw_world_tile(v.x, v.y, color1, color2)
-                if enable_innovs then gui.text(v.x, v.y, v.innov, color1) end
+                draw_world_tile(
+                    v.x, v.y,
+                    const.color1,
+                    const.color2
+                )
+                if enable_innovs then 
+                    gui.text(v.x, v.y, v.innov, const.color1)
+                end
             end
         end
     end
@@ -679,7 +731,6 @@ function new_generation()
             sum = sum + v.calculated_fitness
         end
 
-        print(sum, #genomes)
         return sum / #genomes
     end
 
@@ -710,7 +761,7 @@ function copy_generation(generation)
 end
 
 function new_inital_generation(population_size)
-    print(prefix.network.."Ready, Set, Go! - Algorithm by Novial")
+    print(prefix.network.."Ready, Set, Go! - Algorithm by Andrew Hong")
     local generation = new_generation()
 
     for i=1, population_size do
@@ -800,9 +851,19 @@ function adaptive_mutate()
     if config.adaptive_mutate_mode ~= 0 then
         for k1, v1 in pairs(focus_generation.species) do
             for k2, v2 in pairs(v1.genomes) do
-                if config.adaptive_mutate_mode == 1 then adaptive_mutate1(v2, average_fitness) end
-                if config.adaptive_mutate_mode == 2 then adaptive_mutate2(v2) end
-                if config.adaptive_mutate_mode == 3 then adaptive_mutate3(v2) end
+
+                if config.adaptive_mutate_mode == 1 then
+                    adaptive_mutate1(v2, average_fitness)
+                end
+
+                if config.adaptive_mutate_mode == 2 then
+                    adaptive_mutate2(v2)
+                end
+
+                if config.adaptive_mutate_mode == 3 then
+                    adaptive_mutate3(v2)
+                end
+                
             end
         end
     end
@@ -837,7 +898,9 @@ function mutate_conn_add(genome)
         success = genome:add_connection(math.random(1, #genome:get_nodes()), math.random(config.num_inputs+1, #genome:get_nodes()))
     end
 
-    if success == false then mutate_conn_add(genome) end
+    if not success then
+        mutate_conn_add(genome)
+    end
 end
 
 function mutate_node_add(genome)
@@ -899,7 +962,9 @@ function get_adjusted_fitness(genomes, genome)
     for k, v in pairs(genomes) do
         local spec_com = is_same_species(genome, v)
         local val = 0
-        if spec_com < config.compatibility_threshold then val = 1 end
+        if spec_com < config.compatibility_threshold then
+            val = 1
+        end
         sum = sum + val
     end
     return genome.calculated_fitness / sum
@@ -1083,10 +1148,6 @@ function do_this_when_dead()
         local function compare1(a,b)
             return a.genomes[1].calculated_fitness > b.genomes[1].calculated_fitness
         end
-        
-        local function compare2(a,b)
-            return a.calculated_fitness > b.calculated_fitness
-        end
 
         local new_genomes_created = 0
         table.sort(strong_species, compare1)
@@ -1192,7 +1253,13 @@ end
 function draw_info(generation, species, genome, fitness)
     local text = {"gen: "..generation, "species: "..species, "genome: "..genome, "fitness: "..fitness}
     for i=0, #text-1 do
-        gui.drawtext(x_offset - 3, y_offset + - 3 + box_size*16+8*i, text[i+1], color1, color2)
+        gui.drawtext(
+            const.x_offset - 3,
+            const.y_offset + - 3 + const.box_size * 16 + 8 * i,
+            text[i+1],
+            const.color1,
+            const.color2
+        )
     end
 end
 
@@ -1220,9 +1287,19 @@ while (true) do
     ai_inputs = get_map()
     read_enemies(ai_inputs)
     draw_map(ai_inputs)
-    if config.draw_connections then focus_genome:draw_connections() end
-    if config.draw_nodes then focus_genome:draw_nodes(false) end
-    if current_frame % config.reaction_time == 0 then focus_genome:eval() end
+
+    if config.draw_connections then
+        focus_genome:draw_connections()
+    end
+
+    if config.draw_nodes then
+        focus_genome:draw_nodes(false)
+    end
+
+    if current_frame % config.reaction_time == 0 then
+        focus_genome:eval()
+    end
+
     joypad.set(1, inputs)
     draw_buttons()
     draw_info(focus_generation_key, focus_species_key, focus_genome_key, focus_genome:get_fitness())
@@ -1235,7 +1312,7 @@ while (true) do
         is_timer_set = false
         is_nudged = false
     end
-    if get_game_timer() == start_timeout - 4 and is_timer_set and not is_nudged then
+    if get_game_timer() == start_timeout - 4 and is_timer_set and not is_nudged and config.enable_nudge then
         clear_joypad()
         is_nudged = true
     end
