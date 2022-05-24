@@ -14,3 +14,4 @@ Super Mario Bros RAM Map: https://datacrystal.romhacking.net/wiki/Super_Mario_Br
 
 ## Preview
 ![marioee](https://user-images.githubusercontent.com/35881688/169942861-76ec5247-38f0-4b52-9e7e-9728a40578c2.gif)
+Recognize the colors? The color palette for the AI visuals was taken from Nintendo's failed console, the Virtual Boy.
