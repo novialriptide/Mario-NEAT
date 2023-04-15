@@ -647,6 +647,7 @@ function do_this_when_dead()
     emu.poweron()
     if focus_species_key == #focus_generation.species then
         local average_fitness = focus_generation:get_fitness_average()
+        print(prefix.network.."Global Connections Count : "..#global_connections)
         print(prefix.network.."The average fitness score for generation "..focus_generation_key.." is "..average_fitness)
         if num_no_changes > config.emergency_reproduce and strong_species_selector_mode ~= 0 and config.enable_emergency_reproduce then
             print(prefix.warning.."Changing strong_species_selector_mode to 0")
