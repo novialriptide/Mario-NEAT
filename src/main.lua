@@ -780,6 +780,9 @@ function do_this_when_dead()
 
     focus_species = focus_generation.species[focus_species_key]
     focus_genome = focus_species.genomes[focus_genome_key]
+    
+    -- I have no fucking clue, but I think this function has a memory leak?
+    collectgarbage()
 end
 
 function test_next_gen()
