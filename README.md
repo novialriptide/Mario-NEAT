@@ -1,7 +1,8 @@
 # Mario-NEAT
-A genetic algorithm made from scratch in Lua called NEAT by University of 
-Texas-Austin professors that is able to beat the original Super Mario Bros 1-1 
-on the FCEUX64 emulator.
+A machine-learning genetic algorithm built from the ground up using research from
+the University of Texas-Austin "Neural Evolution of Augmenting Topologies" capable
+of playing and completing a real Super Mario Bros 1-1 ROM utilizing the FCEUX64
+emulator.
 
 ## Links
 Article: http://nn.cs.utexas.edu/downloads/papers/stanley.ec02.pdf
